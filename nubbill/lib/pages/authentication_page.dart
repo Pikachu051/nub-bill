@@ -15,8 +15,9 @@ class AuthenticationPage extends StatelessWidget {
           children: [
             RoundedButton(
               text: 'สมัครบัญชีใหม่',
-              backgroundColor: Colors.lightBlueAccent,
+              backgroundColor: const Color.fromARGB(255, 129, 206, 242),
               textColor: Colors.white,
+              
               onPressed: () {
                 Navigator.push(
                   context,
@@ -28,7 +29,7 @@ class AuthenticationPage extends StatelessWidget {
             RoundedButton(
               text: 'ลงชื่อเข้าใช้',
               backgroundColor: Colors.white,
-              textColor: Colors.lightBlueAccent,
+              textColor: const Color.fromARGB(255, 129, 206, 242),
               outlined: true,
               onPressed: () {
                 Navigator.push(

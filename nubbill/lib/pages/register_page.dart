@@ -18,7 +18,7 @@ class RegisterPage extends StatelessWidget {
               const Text(
                 'ยินดีต้อนรับ! ผมนับบิล',
                 style: TextStyle(
-                  color: Colors.lightBlueAccent,
+                  color: Color.fromARGB(255, 129, 206, 242),
                   fontWeight: FontWeight.bold,
                   fontSize: 24,
                 ),
@@ -32,7 +32,7 @@ class RegisterPage extends StatelessWidget {
                     TextSpan(
                       text: 'เรื่องตัวเลขในทุกมื้อ',
                       style: TextStyle(
-                        color: Colors.lightBlueAccent,
+                        color: Color.fromARGB(255, 129, 206, 242),
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -63,7 +63,7 @@ class RegisterPage extends StatelessWidget {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
                           borderSide: const BorderSide(
-                            color: Colors.lightBlueAccent,
+                            color: Color.fromARGB(255, 129, 206, 242),
                             width: 2,
                           ),
                         ),
@@ -89,7 +89,7 @@ class RegisterPage extends StatelessWidget {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
                           borderSide: const BorderSide(
-                            color: Colors.lightBlueAccent,
+                            color: Color.fromARGB(255, 129, 206, 242),
                             width: 2,
                           ),
                         ),
@@ -117,7 +117,7 @@ class RegisterPage extends StatelessWidget {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
                           borderSide: const BorderSide(
-                            color: Colors.lightBlueAccent,
+                            color: Color.fromARGB(255, 129, 206, 242),
                             width: 2,
                           ),
                         ),
@@ -134,7 +134,7 @@ class RegisterPage extends StatelessWidget {
                 children: [
                   RoundedButton(
                     text: 'รับรหัสยืนยันทาง SMS',
-                    backgroundColor: Colors.lightBlueAccent,
+                    backgroundColor: const Color.fromARGB(255, 129, 206, 242),
                     textColor: Colors.white,
                     onPressed: () {
                       Navigator.push(
@@ -153,7 +153,7 @@ class RegisterPage extends StatelessWidget {
                   SizedBox(width: 5),
                   const Text(
                     'ลงชื่อเข้าใช้',
-                    style: TextStyle(color: Colors.lightBlueAccent),
+                    style: TextStyle(color: Color.fromARGB(255, 129, 206, 242)),
                   ),
                 ],
               ),

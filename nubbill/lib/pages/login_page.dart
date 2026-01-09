@@ -17,7 +17,7 @@ class LoginPage extends StatelessWidget {
               const Text(
                 'พร้อมเคลียร์บิลทริปนี้หรือยัง?',
                 style: TextStyle(
-                  color: Colors.lightBlueAccent,
+                  color: Color.fromARGB(255, 129, 206, 242),
                   fontWeight: FontWeight.bold,
                   fontSize: 24,
                 ),
@@ -31,7 +31,7 @@ class LoginPage extends StatelessWidget {
                     TextSpan(
                       text: 'ติดตามยอดใช้จ่าย และสรุปบิลทริป',
                       style: TextStyle(
-                        color: Colors.lightBlueAccent,
+                        color: const Color.fromARGB(255, 129, 206, 242),
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -62,7 +62,7 @@ class LoginPage extends StatelessWidget {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
                           borderSide: const BorderSide(
-                            color: Colors.lightBlueAccent,
+                            color: const Color.fromARGB(255, 129, 206, 242),
                             width: 2,
                           ),
                         ),
@@ -90,7 +90,7 @@ class LoginPage extends StatelessWidget {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
                           borderSide: const BorderSide(
-                            color: Colors.lightBlueAccent,
+                            color: Color.fromARGB(255, 129, 206, 242),
                             width: 2,
                           ),
                         ),
@@ -109,7 +109,7 @@ class LoginPage extends StatelessWidget {
                 children: [
                   RoundedButton(
                     text: 'เริ่มหารบิลกันเลย!',
-                    backgroundColor: Colors.lightBlueAccent,
+                    backgroundColor: const Color.fromARGB(255, 129, 206, 242),
                     textColor: Colors.white,
                     onPressed: () {
                       // Navigator.push(
@@ -128,7 +128,7 @@ class LoginPage extends StatelessWidget {
                   SizedBox(width: 5),
                   const Text(
                     'สมัครบัญชีใหม่',
-                    style: TextStyle(color: Colors.lightBlueAccent),
+                    style: TextStyle(color: const Color.fromARGB(255, 129, 206, 242)),
                   ),
                 ],
               ),

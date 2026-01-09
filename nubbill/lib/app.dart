@@ -10,7 +10,7 @@ class App extends StatelessWidget {
       title: 'Nub-Bill',
       theme: ThemeData(
         useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.lightBlue),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color.fromARGB(255, 129, 206, 242)),
         fontFamily: 'LineSeedSansTH',
       ),
       home: const AuthenticationPage(),
