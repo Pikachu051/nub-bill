@@ -30,6 +30,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  google_fonts: ^6.1.0
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -51,6 +52,14 @@ dev_dependencies:
 
 # The following section is specific to Flutter packages.
 flutter:
+  fonts:
+    - family: LINESeedSansTH
+      fonts:
+        - asset: assets/fonts/Line_Seed_Sans_TH/LINESeedSansTH_A_Bd.ttf
+        - asset: assets/fonts/Line_Seed_Sans_TH/LINESeedSansTH_A_He.ttf
+        - asset: assets/fonts/Line_Seed_Sans_TH/LINESeedSansTH_A_Rg.ttf
+        - asset: assets/fonts/Line_Seed_Sans_TH/LINESeedSansTH_A_Th.ttf
+        - asset: assets/fonts/Line_Seed_Sans_TH/LINESeedSansTH_A_XBd.ttf
 
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
