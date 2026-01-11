@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nubbill/pages/verification_page.dart';
+import 'package:nubbill/pages/login_page.dart';
 import 'package:nubbill/widgets/rounded_button.dart';
 
 class RegisterPage extends StatelessWidget {
@@ -151,9 +152,21 @@ class RegisterPage extends StatelessWidget {
                 children: [
                   const Text("มีบัญชีอยู่แล้ว?"),
                   SizedBox(width: 5),
-                  const Text(
-                    'ลงชื่อเข้าใช้',
-                    style: TextStyle(color: Color.fromARGB(255, 129, 206, 242)),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const LoginPage(),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'ลงชื่อเข้าใช้',
+                      style: TextStyle(
+                        color: Color.fromARGB(255, 129, 206, 242),
+                      ),
+                    ),
                   ),
                 ],
               ),

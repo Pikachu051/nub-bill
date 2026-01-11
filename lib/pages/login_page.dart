@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nubbill/widgets/rounded_button.dart';
+import 'package:nubbill/pages/register_page.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -100,7 +101,13 @@ class LoginPage extends StatelessWidget {
                 ),
               ),
               SizedBox(height: 5),
-              Align(alignment: Alignment.centerRight, child: Text('จำรหัสผ่านไม่ได้?', style: TextStyle(color: Colors.lightBlueAccent),)),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'จำรหัสผ่านไม่ได้?',
+                  style: TextStyle(color: const Color.fromARGB(255, 129, 206, 242)),
+                ),
+              ),
 
               SizedBox(height: 40),
 
@@ -126,9 +133,21 @@ class LoginPage extends StatelessWidget {
                 children: [
                   const Text("ยังไม่มีบัญชี?"),
                   SizedBox(width: 5),
-                  const Text(
-                    'สมัครบัญชีใหม่',
-                    style: TextStyle(color: const Color.fromARGB(255, 129, 206, 242)),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const RegisterPage(),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'สมัครบัญชีใหม่',
+                      style: TextStyle(
+                        color: Color.fromARGB(255, 129, 206, 242),
+                      ),
+                    ),
                   ),
                 ],
               ),
