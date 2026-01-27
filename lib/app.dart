@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nubbill/pages/authentication_page.dart';
+import 'package:nubbill/pages/home_page.dart';
 
 class App extends StatelessWidget {
   const App({super.key});
@@ -13,7 +14,7 @@ class App extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color.fromARGB(255, 129, 206, 242)),
         fontFamily: 'LineSeedSansTH',
       ),
-      home: const AuthenticationPage(),
+      home: const HomePage(),
     );
   }
 }
