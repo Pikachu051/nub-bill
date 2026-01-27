@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/screens/verification_page.dart';
+import 'package:nubbill/screens/login_page.dart';
 import 'package:nubbill/widgets/rounded_button.dart';
-import 'package:nubbill/pages/register_page.dart';
 
-class LoginPage extends StatelessWidget {
-  const LoginPage({super.key});
+class RegisterPage extends StatelessWidget {
+  const RegisterPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -16,7 +17,7 @@ class LoginPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'พร้อมเคลียร์บิลทริปนี้หรือยัง?',
+                'ยินดีต้อนรับ! ผมนับบิล',
                 style: TextStyle(
                   color: Color.fromARGB(255, 129, 206, 242),
                   fontWeight: FontWeight.bold,
@@ -26,13 +27,13 @@ class LoginPage extends StatelessWidget {
               SizedBox(height: 16),
               Text.rich(
                 TextSpan(
-                  text: 'เข้าใช้งานเพื่อ ',
+                  text: 'สมัครสมาชิกเพื่อให้เราช่วยดูแล',
                   style: TextStyle(fontSize: 14),
                   children: [
                     TextSpan(
-                      text: 'ติดตามยอดใช้จ่าย และสรุปบิลทริป',
+                      text: 'เรื่องตัวเลขในทุกมื้อ',
                       style: TextStyle(
-                        color: const Color.fromARGB(255, 129, 206, 242),
+                        color: Color.fromARGB(255, 129, 206, 242),
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -40,7 +41,7 @@ class LoginPage extends StatelessWidget {
                   ],
                 ),
               ),
-              const Text('กับเพื่อนได้ทันที!'),
+              const Text('คุณแค่เที่ยว เรื่องหารบิลเราจัดการเอง!'),
               SizedBox(height: 40),
               Form(
                 child: Column(
@@ -63,7 +64,33 @@ class LoginPage extends StatelessWidget {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
                           borderSide: const BorderSide(
-                            color: const Color.fromARGB(255, 129, 206, 242),
+                            color: Color.fromARGB(255, 129, 206, 242),
+                            width: 2,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    TextFormField(
+                      decoration: InputDecoration(
+                        hintText: 'กรอกชื่อเล่น',
+                        hintStyle: const TextStyle(color: Colors.grey),
+                        filled: true,
+                        fillColor: Color(0x1414161A),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 16,
+                          horizontal: 20,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          borderSide: BorderSide.none,
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          borderSide: const BorderSide(
+                            color: Color.fromARGB(255, 129, 206, 242),
                             width: 2,
                           ),
                         ),
@@ -100,14 +127,6 @@ class LoginPage extends StatelessWidget {
                   ],
                 ),
               ),
-              SizedBox(height: 5),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text(
-                  'จำรหัสผ่านไม่ได้?',
-                  style: TextStyle(color: const Color.fromARGB(255, 129, 206, 242)),
-                ),
-              ),
 
               SizedBox(height: 40),
 
@@ -115,14 +134,14 @@ class LoginPage extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   RoundedButton(
-                    text: 'เริ่มหารบิลกันเลย!',
+                    text: 'รับรหัสยืนยันทาง SMS',
                     backgroundColor: const Color.fromARGB(255, 129, 206, 242),
                     textColor: Colors.white,
                     onPressed: () {
-                      // Navigator.push(
-                      //   context,
-                      //   MaterialPageRoute(builder: (_) => LoginPage()),
-                      // );
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => VerificationPage()),
+                      );
                     },
                   ),
                 ],
@@ -131,19 +150,19 @@ class LoginPage extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text("ยังไม่มีบัญชี?"),
+                  const Text("มีบัญชีอยู่แล้ว?"),
                   SizedBox(width: 5),
                   GestureDetector(
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const RegisterPage(),
+                          builder: (context) => const LoginPage(),
                         ),
                       );
                     },
                     child: const Text(
-                      'สมัครบัญชีใหม่',
+                      'ลงชื่อเข้าใช้',
                       style: TextStyle(
                         color: Color.fromARGB(255, 129, 206, 242),
                       ),

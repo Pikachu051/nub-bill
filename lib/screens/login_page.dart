@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:nubbill/pages/verification_page.dart';
-import 'package:nubbill/pages/login_page.dart';
 import 'package:nubbill/widgets/rounded_button.dart';
+import 'package:nubbill/screens/register_page.dart';
 
-class RegisterPage extends StatelessWidget {
-  const RegisterPage({super.key});
+class LoginPage extends StatelessWidget {
+  const LoginPage({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -17,7 +16,7 @@ class RegisterPage extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'ยินดีต้อนรับ! ผมนับบิล',
+                'พร้อมเคลียร์บิลทริปนี้หรือยัง?',
                 style: TextStyle(
                   color: Color.fromARGB(255, 129, 206, 242),
                   fontWeight: FontWeight.bold,
@@ -27,13 +26,13 @@ class RegisterPage extends StatelessWidget {
               SizedBox(height: 16),
               Text.rich(
                 TextSpan(
-                  text: 'สมัครสมาชิกเพื่อให้เราช่วยดูแล',
+                  text: 'เข้าใช้งานเพื่อ ',
                   style: TextStyle(fontSize: 14),
                   children: [
                     TextSpan(
-                      text: 'เรื่องตัวเลขในทุกมื้อ',
+                      text: 'ติดตามยอดใช้จ่าย และสรุปบิลทริป',
                       style: TextStyle(
-                        color: Color.fromARGB(255, 129, 206, 242),
+                        color: const Color.fromARGB(255, 129, 206, 242),
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -41,7 +40,7 @@ class RegisterPage extends StatelessWidget {
                   ],
                 ),
               ),
-              const Text('คุณแค่เที่ยว เรื่องหารบิลเราจัดการเอง!'),
+              const Text('กับเพื่อนได้ทันที!'),
               SizedBox(height: 40),
               Form(
                 child: Column(
@@ -64,33 +63,7 @@ class RegisterPage extends StatelessWidget {
                         focusedBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(30),
                           borderSide: const BorderSide(
-                            color: Color.fromARGB(255, 129, 206, 242),
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    TextFormField(
-                      decoration: InputDecoration(
-                        hintText: 'กรอกชื่อเล่น',
-                        hintStyle: const TextStyle(color: Colors.grey),
-                        filled: true,
-                        fillColor: Color(0x1414161A),
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 20,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: const BorderSide(
-                            color: Color.fromARGB(255, 129, 206, 242),
+                            color: const Color.fromARGB(255, 129, 206, 242),
                             width: 2,
                           ),
                         ),
@@ -127,6 +100,14 @@ class RegisterPage extends StatelessWidget {
                   ],
                 ),
               ),
+              SizedBox(height: 5),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'จำรหัสผ่านไม่ได้?',
+                  style: TextStyle(color: const Color.fromARGB(255, 129, 206, 242)),
+                ),
+              ),
 
               SizedBox(height: 40),
 
@@ -134,14 +115,14 @@ class RegisterPage extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   RoundedButton(
-                    text: 'รับรหัสยืนยันทาง SMS',
+                    text: 'เริ่มหารบิลกันเลย!',
                     backgroundColor: const Color.fromARGB(255, 129, 206, 242),
                     textColor: Colors.white,
                     onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => VerificationPage()),
-                      );
+                      // Navigator.push(
+                      //   context,
+                      //   MaterialPageRoute(builder: (_) => LoginPage()),
+                      // );
                     },
                   ),
                 ],
@@ -150,19 +131,19 @@ class RegisterPage extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text("มีบัญชีอยู่แล้ว?"),
+                  const Text("ยังไม่มีบัญชี?"),
                   SizedBox(width: 5),
                   GestureDetector(
                     onTap: () {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => const LoginPage(),
+                          builder: (context) => const RegisterPage(),
                         ),
                       );
                     },
                     child: const Text(
-                      'ลงชื่อเข้าใช้',
+                      'สมัครบัญชีใหม่',
                       style: TextStyle(
                         color: Color.fromARGB(255, 129, 206, 242),
                       ),

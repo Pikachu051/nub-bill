@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:nubbill/pages/register_page.dart';
-import 'package:nubbill/pages/login_page.dart';
+import 'package:nubbill/screens/register_page.dart';
+import 'package:nubbill/screens/login_page.dart';
 import '../widgets/rounded_button.dart';
 
 class AuthenticationPage extends StatelessWidget {
