@@ -1,0 +1,180 @@
+/// API Configuration for Nub-Bill Backend
+library;
+
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:nubbill/config/supabase_config.dart';
+
+/// API configuration constants
+class ApiConfig {
+  /// Base URL for the backend API
+  /// Use 'http://10.0.2.2:3000' for Android emulator
+  /// Use 'http://localhost:3000' for iOS simulator/web
+  /// Use your computer's IP for real devices
+  static const String baseUrl = 'http://10.0.2.2:3000';
+
+  /// API prefix
+  static const String apiPrefix = '/api';
+
+  /// Full API base URL
+  static String get apiBaseUrl => '$baseUrl$apiPrefix';
+}
+
+/// HTTP client wrapper that injects Supabase JWT token
+class ApiClient {
+  final http.Client _client = http.Client();
+
+  /// Get current JWT token from Supabase session
+  String? get _accessToken =>
+      SupabaseConfig.client.auth.currentSession?.accessToken;
+
+  /// Build headers with authorization
+  Map<String, String> get _headers {
+    final headers = <String, String>{'Content-Type': 'application/json'};
+
+    final token = _accessToken;
+    if (token != null) {
+      headers['Authorization'] = 'Bearer $token';
+    }
+
+    return headers;
+  }
+
+  /// GET request
+  Future<ApiResponse> get(String endpoint) async {
+    try {
+      final response = await _client.get(
+        Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
+        headers: _headers,
+      );
+      return ApiResponse.fromHttpResponse(response);
+    } catch (e) {
+      return ApiResponse.error(e.toString());
+    }
+  }
+
+  /// POST request
+  Future<ApiResponse> post(
+    String endpoint, {
+    Map<String, dynamic>? body,
+  }) async {
+    try {
+      final response = await _client.post(
+        Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
+        headers: _headers,
+        body: body != null ? jsonEncode(body) : null,
+      );
+      return ApiResponse.fromHttpResponse(response);
+    } catch (e) {
+      return ApiResponse.error(e.toString());
+    }
+  }
+
+  /// PATCH request
+  Future<ApiResponse> patch(
+    String endpoint, {
+    Map<String, dynamic>? body,
+  }) async {
+    try {
+      final response = await _client.patch(
+        Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
+        headers: _headers,
+        body: body != null ? jsonEncode(body) : null,
+      );
+      return ApiResponse.fromHttpResponse(response);
+    } catch (e) {
+      return ApiResponse.error(e.toString());
+    }
+  }
+
+  /// DELETE request
+  Future<ApiResponse> delete(String endpoint) async {
+    try {
+      final response = await _client.delete(
+        Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
+        headers: _headers,
+      );
+      return ApiResponse.fromHttpResponse(response);
+    } catch (e) {
+      return ApiResponse.error(e.toString());
+    }
+  }
+
+  /// PUT request
+  Future<ApiResponse> put(String endpoint, {Map<String, dynamic>? body}) async {
+    try {
+      final response = await _client.put(
+        Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
+        headers: _headers,
+        body: body != null ? jsonEncode(body) : null,
+      );
+      return ApiResponse.fromHttpResponse(response);
+    } catch (e) {
+      return ApiResponse.error(e.toString());
+    }
+  }
+
+  /// POST multipart request (for file uploads)
+  Future<ApiResponse> uploadFile(
+    String endpoint,
+    List<int> fileBytes,
+    String fileName,
+  ) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
+      );
+
+      request.headers.addAll(_headers);
+      request.files.add(
+        http.MultipartFile.fromBytes('file', fileBytes, filename: fileName),
+      );
+
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+      return ApiResponse.fromHttpResponse(response);
+    } catch (e) {
+      return ApiResponse.error(e.toString());
+    }
+  }
+}
+
+/// API Response wrapper
+class ApiResponse {
+  final int? statusCode;
+  final dynamic data;
+  final String? error;
+
+  ApiResponse({this.statusCode, this.data, this.error});
+
+  bool get isSuccess =>
+      statusCode != null && statusCode! >= 200 && statusCode! < 300;
+
+  factory ApiResponse.fromHttpResponse(http.Response response) {
+    dynamic data;
+    String? error;
+
+    try {
+      if (response.body.isNotEmpty) {
+        data = jsonDecode(response.body);
+        // Check if response contains an error field
+        if (data is Map && data.containsKey('error')) {
+          error = data['error']?.toString();
+        }
+      }
+    } catch (e) {
+      data = response.body;
+    }
+
+    return ApiResponse(
+      statusCode: response.statusCode,
+      data: data,
+      error: error,
+    );
+  }
+
+  factory ApiResponse.error(String message) {
+    return ApiResponse(error: message);
+  }
+}

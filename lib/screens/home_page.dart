@@ -1,244 +1,515 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:nubbill/services/auth_repository.dart';
+import 'package:nubbill/services/profile_service.dart';
+import 'package:nubbill/models/trip_model.dart';
+import 'package:nubbill/config/supabase_config.dart';
 
-class HomePage extends StatelessWidget {
+/// Provider for user's groups directly from Supabase
+final userTripsProvider = FutureProvider<List<Trip>>((ref) async {
+  final userId = SupabaseConfig.currentUser?.id;
+  if (userId == null) return [];
+
+  // Get trips where user is a member
+  final response = await SupabaseConfig.client
+      .from('trip_members')
+      .select('trip:trips(*)')
+      .eq('user_id', userId);
+
+  final trips = <Trip>[];
+  for (final item in response as List) {
+    if (item['trip'] != null) {
+      trips.add(Trip.fromJson(item['trip'] as Map<String, dynamic>));
+    }
+  }
+  return trips;
+});
+
+/// Provider for wallet summary (total owed to user & user owes)
+final walletSummaryProvider = FutureProvider<Map<String, double>>((ref) async {
+  final userId = SupabaseConfig.currentUser?.id;
+  if (userId == null) return {'toReceive': 0, 'toPay': 0};
+
+  // Get member IDs for this user
+  final memberResponse = await SupabaseConfig.client
+      .from('trip_members')
+      .select('id')
+      .eq('user_id', userId);
+
+  final memberIds = (memberResponse as List)
+      .map((m) => m['id'] as String)
+      .toList();
+
+  if (memberIds.isEmpty) return {'toReceive': 0, 'toPay': 0};
+
+  // Get expense splits where user owes money (unpaid)
+  final owesResponse = await SupabaseConfig.client
+      .from('expense_splits')
+      .select('amount')
+      .inFilter('member_id', memberIds)
+      .eq('status', 'pending');
+
+  double toPay = 0;
+  for (final split in owesResponse as List) {
+    toPay += (split['amount'] as num).toDouble();
+  }
+
+  // Get expenses created by user's members where others owe money
+  final toReceiveResponse = await SupabaseConfig.client
+      .from('expenses')
+      .select('expense_splits(amount, status)')
+      .inFilter('paid_by_member_id', memberIds);
+
+  double toReceive = 0;
+  for (final expense in toReceiveResponse as List) {
+    final splits = expense['expense_splits'] as List? ?? [];
+    for (final split in splits) {
+      if (split['status'] == 'pending') {
+        toReceive += (split['amount'] as num).toDouble();
+      }
+    }
+  }
+
+  return {'toReceive': toReceive, 'toPay': toPay};
+});
+
+class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          Stack(
-            children: [
-              // Blue bg
-              ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(32),
-                  bottomRight: Radius.circular(32),
-                ),
-                child: Container(
-                  width: double.infinity,
-                  height: 200,
-                  color: Color.fromARGB(255, 129, 206, 242),
-                ),
-              ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authRepositoryProvider).currentUser;
+    final profileAsync = ref.watch(myProfileProvider);
 
-              // Header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 60, 16, 16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    CircleAvatar(
-                      radius: 30,
-                      backgroundImage: NetworkImage(
-                        "https://example.com/profile.jpg",
+    // Get nickname and avatar from profile (with fallback to auth metadata)
+    final nickname = profileAsync.when(
+      data: (profile) =>
+          profile.nickname ?? user?.userMetadata?['nickname'] ?? 'User',
+      loading: () => user?.userMetadata?['nickname'] ?? 'User',
+      error: (_, __) => user?.userMetadata?['nickname'] ?? 'User',
+    );
+    final avatarUrl = profileAsync.when(
+      data: (profile) => profile.avatarUrl,
+      loading: () => user?.userMetadata?['avatar_url'] as String?,
+      error: (_, __) => user?.userMetadata?['avatar_url'] as String?,
+    );
+
+    final tripsAsync = ref.watch(userTripsProvider);
+    final walletAsync = ref.watch(walletSummaryProvider);
+
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header with overlapping wallet card
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                // Blue background with rounded bottom
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(32),
+                    bottomRight: Radius.circular(32),
+                  ),
+                  child: Container(
+                    width: double.infinity,
+                    height: 180,
+                    color: const Color(0xFF81CEF2),
+                    child: SafeArea(
+                      bottom: false,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Avatar with white border
+                            Container(
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white,
+                                  width: 2,
+                                ),
+                              ),
+                              child: CircleAvatar(
+                                radius: 30,
+                                backgroundColor: Colors.white24,
+                                backgroundImage: avatarUrl != null
+                                    ? NetworkImage(avatarUrl)
+                                    : null,
+                                child: avatarUrl == null
+                                    ? const Icon(
+                                        Icons.person,
+                                        size: 30,
+                                        color: Colors.white,
+                                      )
+                                    : null,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            // Text
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  'คุณ, $nickname',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                const Text(
+                                  'เคลียร์บิลกันเถอะ!',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 24,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Text(
-                          'คุณ, โลลี่ป๊อป',
-                          style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ),
+                // Wallet card overlapping header - positioned at the bottom
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  top:
+                      130, // Position card so it starts inside the blue area at the bottom
+                  child: _buildWalletCard(walletAsync),
+                ),
+              ],
+            ),
+
+            // Spacing for the overlapping card (wallet card is ~160px tall, positioned at 130, blue header is 180)
+            // Card extends from 130 to ~290, so we need 290 - 180 = 110 spacing
+            const SizedBox(height: 130),
+
+            // Groups section
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Top padding for groups section
+                  const SizedBox(height: 20),
+
+                  // Groups Header
+                  _buildGroupsHeader(tripsAsync),
+
+                  const SizedBox(height: 12),
+
+                  // Groups List
+                  _buildGroupsList(context, tripsAsync),
+
+                  // Bottom padding for FAB
+                  const SizedBox(height: 80),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      // FAB for creating new group
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push('/groups/create'),
+        backgroundColor: const Color(0xFF81CEF2),
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text(
+          'สร้างกลุ่มใหม่',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildWalletCard(AsyncValue<Map<String, double>> walletAsync) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: walletAsync.when(
+        loading: () => const Center(
+          child: Padding(
+            padding: EdgeInsets.all(20),
+            child: CircularProgressIndicator(),
+          ),
+        ),
+        error: (_, __) => const Text('ไม่สามารถโหลดข้อมูลได้'),
+        data: (wallet) {
+          final toReceive = wallet['toReceive'] ?? 0;
+          final toPay = wallet['toPay'] ?? 0;
+          final balance = toReceive - toPay;
+
+          return Column(
+            children: [
+              const Text(
+                'ภาพรวมกระเป๋าตังค์',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${balance >= 0 ? '+' : ''}${_formatMoney(balance)}฿',
+                style: TextStyle(
+                  color: balance >= 0 ? const Color(0xFF81CEF2) : Colors.red,
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(height: 1, color: Colors.grey[200]),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  // To Receive
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.arrow_downward,
+                              size: 16,
+                              color: Colors.green[600],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'รอรับเงิน',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
                         ),
-                        SizedBox(height: 4),
+                        const SizedBox(height: 4),
                         Text(
-                          "เคลียร์บิลกันเถอะ!",
+                          '${_formatMoney(toReceive)}฿',
                           style: TextStyle(
-                            color: Colors.white,
+                            color: Colors.green[600],
                             fontWeight: FontWeight.bold,
-                            fontSize: 24,
+                            fontSize: 16,
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  ),
+                  Container(width: 1, height: 40, color: Colors.grey[300]),
+                  // To Pay
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.arrow_upward,
+                              size: 16,
+                              color: Colors.red[400],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              'ค้างจ่าย',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          '${_formatMoney(toPay)}฿',
+                          style: TextStyle(
+                            color: Colors.red[400],
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ],
-          ),
-
-          // เนื้อหาด้านล่าง
-          Expanded(
-            child: Container(
-              color: Colors.white,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // ===== การ์ดภาพรวมกระเป๋า =====
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 10,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        children: [
-                          const Text(
-                            'ภาพรวมกระเป๋าตังค์',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          const Text(
-                            '+1,300.00฿',
-                            style: TextStyle(
-                              color: Colors.blue,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const Divider(height: 24),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  children: const [
-                                    Text(
-                                      'รอรับเงิน',
-                                      style: TextStyle(color: Colors.grey),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      '1,500.00฿',
-                                      style: TextStyle(
-                                        color: Colors.green,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              Container(
-                                width: 1,
-                                height: 32,
-                                color: Colors.grey.shade300,
-                              ),
-                              Expanded(
-                                child: Column(
-                                  children: const [
-                                    Text(
-                                      'ค้างจ่าย',
-                                      style: TextStyle(color: Colors.grey),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      '200.00฿',
-                                      style: TextStyle(
-                                        color: Colors.red,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const SizedBox(height: 24),
-
-                    // ===== หัวข้อกลุ่ม =====
-                    const Text(
-                      'กลุ่มของคุณ (8 กลุ่ม)',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-
-                    // ===== รายการกลุ่ม =====
-                    _groupItem(
-                      iconColor: Colors.orange,
-                      title: 'เที่ยวเชียงใหม่',
-                      date: '21/12/68 - 24/12/68',
-                      amount: '200.00฿',
-                      isDebt: true,
-                    ),
-                    _groupItem(
-                      iconColor: Colors.blue,
-                      title: 'วันเกิดซูซูย',
-                      date: '03/01/69',
-                      amount: '1,500.00฿',
-                      isDebt: false,
-                    ),
-                    _groupItem(
-                      iconColor: Colors.yellow,
-                      title: 'เดทกับแฟน',
-                      date: '03/01/69',
-                      amount: '350.00฿',
-                      isDebt: false,
-                    ),
-
-                    const SizedBox(height: 80), // เว้นให้ปุ่มลอย
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+          );
+        },
       ),
     );
   }
-}
 
-// Widget ชั่วตราว
-Widget _groupItem({
-  required Color iconColor,
-  required String title,
-  required String date,
-  required String amount,
-  required bool isDebt,
-}) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 8),
-    child: Row(
+  Widget _buildGroupsHeader(AsyncValue<List<Trip>> tripsAsync) {
+    final count = tripsAsync.value?.length ?? 0;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: iconColor.withOpacity(0.2),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Icon(Icons.home, color: iconColor),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text(date, style: const TextStyle(color: Colors.grey)),
-            ],
-          ),
-        ),
         Text(
-          amount,
-          style: TextStyle(
-            color: isDebt ? Colors.red : Colors.green,
-            fontWeight: FontWeight.bold,
-          ),
+          'กลุ่มของคุณ ($count กลุ่ม)',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        // Filter icon (from design)
+        IconButton(
+          onPressed: () {
+            // TODO: Show filter options
+          },
+          icon: Icon(Icons.tune, color: Colors.grey[600]),
         ),
       ],
-    ),
-  );
+    );
+  }
+
+  Widget _buildGroupsList(
+    BuildContext context,
+    AsyncValue<List<Trip>> tripsAsync,
+  ) {
+    return tripsAsync.when(
+      loading: () => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40),
+          child: CircularProgressIndicator(),
+        ),
+      ),
+      error: (err, _) => Center(
+        child: Column(
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+            const SizedBox(height: 8),
+            Text(
+              'ไม่สามารถโหลดกลุ่มได้',
+              style: TextStyle(color: Colors.grey[600]),
+            ),
+          ],
+        ),
+      ),
+      data: (trips) {
+        if (trips.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(40),
+              child: Column(
+                children: [
+                  Icon(Icons.group_outlined, size: 64, color: Colors.grey[300]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'ยังไม่มีกลุ่ม',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'กดปุ่มด้านล่างเพื่อสร้างกลุ่มใหม่',
+                    style: TextStyle(color: Colors.grey[400], fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: trips
+              .map((trip) => _buildGroupCard(context, trip))
+              .toList(),
+        );
+      },
+    );
+  }
+
+  Widget _buildGroupCard(BuildContext context, Trip trip) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        leading: CircleAvatar(
+          radius: 24,
+          backgroundColor: const Color(0xFF81CEF2).withOpacity(0.1),
+          backgroundImage: trip.coverUrl != null
+              ? NetworkImage(trip.coverUrl!)
+              : null,
+          child: trip.coverUrl == null
+              ? Icon(trip.category.icon, color: const Color(0xFF81CEF2))
+              : null,
+        ),
+        title: Text(
+          trip.name,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+        ),
+        subtitle: Text(
+          _formatDateRange(trip.startDate, trip.endDate),
+          style: TextStyle(color: Colors.grey[500], fontSize: 13),
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              'ค้างจ่าย',
+              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '0.00฿', // TODO: Calculate from expense_splits
+              style: TextStyle(
+                color: Colors.red[400],
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+        onTap: () => context.push('/groups/${trip.id}'),
+      ),
+    );
+  }
+
+  String _formatDateRange(DateTime? start, DateTime? end) {
+    if (start == null && end == null) return '';
+    if (start == null) return _formatDate(end!);
+    if (end == null) return _formatDate(start);
+    return '${_formatDate(start)} - ${_formatDate(end)}';
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year + 543}'; // Thai Buddhist year
+  }
+
+  String _formatMoney(double amount) {
+    if (amount == 0) return '0.00';
+    return amount
+        .toStringAsFixed(2)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
+        );
+  }
 }

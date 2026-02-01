@@ -1,10 +1,79 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/screens/verification_page.dart';
 import 'package:nubbill/screens/login_page.dart';
 import 'package:nubbill/widgets/rounded_button.dart';
 
-class RegisterPage extends StatelessWidget {
+class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
+
+  @override
+  State<RegisterPage> createState() => _RegisterPageState();
+}
+
+class _RegisterPageState extends State<RegisterPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _emailController = TextEditingController();
+  final _nicknameController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _isLoading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _nicknameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signUp() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      final email = _emailController.text.trim();
+      final nickname = _nicknameController.text.trim();
+      final password = _passwordController.text;
+
+      // Sign up with email - Supabase will send OTP email automatically
+      await SupabaseConfig.client.auth.signUp(
+        email: email,
+        password: password,
+        data: {'nickname': nickname},
+      );
+
+      if (mounted) {
+        // Navigate to verification page with email
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => VerificationPage(email: email, nickname: nickname),
+          ),
+        );
+      }
+    } on AuthException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('เกิดข้อผิดพลาด: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -12,7 +81,7 @@ class RegisterPage extends StatelessWidget {
       body: Padding(
         padding: const EdgeInsets.only(top: 60),
         child: Padding(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -24,16 +93,16 @@ class RegisterPage extends StatelessWidget {
                   fontSize: 24,
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text.rich(
                 TextSpan(
                   text: 'สมัครสมาชิกเพื่อให้เราช่วยดูแล',
-                  style: TextStyle(fontSize: 14),
+                  style: const TextStyle(fontSize: 14),
                   children: [
                     TextSpan(
                       text: 'เรื่องตัวเลขในทุกมื้อ',
                       style: TextStyle(
-                        color: Color.fromARGB(255, 129, 206, 242),
+                        color: const Color.fromARGB(255, 129, 206, 242),
                         fontWeight: FontWeight.bold,
                         fontSize: 14,
                       ),
@@ -42,17 +111,29 @@ class RegisterPage extends StatelessWidget {
                 ),
               ),
               const Text('คุณแค่เที่ยว เรื่องหารบิลเราจัดการเอง!'),
-              SizedBox(height: 40),
+              const SizedBox(height: 40),
               Form(
+                key: _formKey,
                 child: Column(
                   children: [
                     // Email
                     TextFormField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'กรุณากรอกอีเมล';
+                        }
+                        if (!value.contains('@')) {
+                          return 'กรุณากรอกอีเมลให้ถูกต้อง';
+                        }
+                        return null;
+                      },
                       decoration: InputDecoration(
-                        hintText: 'กรอกเบอร์โทร',
+                        hintText: 'กรอกอีเมล',
                         hintStyle: const TextStyle(color: Colors.grey),
                         filled: true,
-                        fillColor: Color(0x1414161A),
+                        fillColor: const Color(0x1414161A),
                         contentPadding: const EdgeInsets.symmetric(
                           vertical: 16,
                           horizontal: 20,
@@ -68,17 +149,32 @@ class RegisterPage extends StatelessWidget {
                             width: 2,
                           ),
                         ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                        ),
                       ),
                     ),
 
                     const SizedBox(height: 16),
 
+                    // Nickname
                     TextFormField(
+                      controller: _nicknameController,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'กรุณากรอกชื่อเล่น';
+                        }
+                        return null;
+                      },
                       decoration: InputDecoration(
                         hintText: 'กรอกชื่อเล่น',
                         hintStyle: const TextStyle(color: Colors.grey),
                         filled: true,
-                        fillColor: Color(0x1414161A),
+                        fillColor: const Color(0x1414161A),
                         contentPadding: const EdgeInsets.symmetric(
                           vertical: 16,
                           horizontal: 20,
@@ -91,6 +187,13 @@ class RegisterPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(30),
                           borderSide: const BorderSide(
                             color: Color.fromARGB(255, 129, 206, 242),
+                            width: 2,
+                          ),
+                        ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
                             width: 2,
                           ),
                         ),
@@ -101,12 +204,22 @@ class RegisterPage extends StatelessWidget {
 
                     // Password
                     TextFormField(
+                      controller: _passwordController,
                       obscureText: true,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'กรุณากรอกรหัสผ่าน';
+                        }
+                        if (value.length < 6) {
+                          return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+                        }
+                        return null;
+                      },
                       decoration: InputDecoration(
                         hintText: 'รหัสผ่าน',
                         hintStyle: const TextStyle(color: Colors.grey),
                         filled: true,
-                        fillColor: Color(0x1414161A),
+                        fillColor: const Color(0x1414161A),
                         contentPadding: const EdgeInsets.symmetric(
                           vertical: 16,
                           horizontal: 20,
@@ -122,36 +235,47 @@ class RegisterPage extends StatelessWidget {
                             width: 2,
                           ),
                         ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(30),
+                          borderSide: const BorderSide(
+                            color: Colors.red,
+                            width: 2,
+                          ),
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
 
-              SizedBox(height: 40),
+              const SizedBox(height: 40),
 
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  RoundedButton(
-                    text: 'รับรหัสยืนยันทาง SMS',
-                    backgroundColor: const Color.fromARGB(255, 129, 206, 242),
-                    textColor: Colors.white,
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => VerificationPage()),
-                      );
-                    },
-                  ),
+                  _isLoading
+                      ? const CircularProgressIndicator(
+                          color: Color.fromARGB(255, 129, 206, 242),
+                        )
+                      : RoundedButton(
+                          text: 'รับรหัสยืนยันทางอีเมล',
+                          backgroundColor: const Color.fromARGB(
+                            255,
+                            129,
+                            206,
+                            242,
+                          ),
+                          textColor: Colors.white,
+                          onPressed: _signUp,
+                        ),
                 ],
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   const Text("มีบัญชีอยู่แล้ว?"),
-                  SizedBox(width: 5),
+                  const SizedBox(width: 5),
                   GestureDetector(
                     onTap: () {
                       Navigator.push(

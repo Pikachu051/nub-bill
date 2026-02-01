@@ -1,29 +1,20 @@
 import 'package:flutter/material.dart';
-<<<<<<< Updated upstream
-import 'package:nubbill/pages/authentication_page.dart';
-import 'package:nubbill/pages/home_page.dart';
-=======
-import 'package:nubbill/screens/authentication_page.dart';
-import 'package:nubbill/screens/create_group_page.dart';
->>>>>>> Stashed changes
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:nubbill/config/router.dart';
+import 'package:nubbill/config/theme.dart';
 
-class App extends StatelessWidget {
+class App extends ConsumerWidget {
   const App({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
+  Widget build(BuildContext context, WidgetRef ref) {
+    final router = ref.watch(routerProvider);
+
+    return MaterialApp.router(
       title: 'Nub-Bill',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color.fromARGB(255, 129, 206, 242)),
-        fontFamily: 'LineSeedSansTH',
-      ),
-<<<<<<< Updated upstream
-      home: const HomePage(),
-=======
-      home: const CreateGroupPage(),
->>>>>>> Stashed changes
+      theme: AppTheme.lightTheme,
+      routerConfig: router,
+      debugShowCheckedModeBanner: false,
     );
   }
 }
