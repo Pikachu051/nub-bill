@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:nubbill/services/friend_service.dart';
+import 'package:nubbill/widgets/add_friend_modal.dart';
 
 class FriendsScreen extends ConsumerStatefulWidget {
   const FriendsScreen({super.key});
@@ -9,55 +11,286 @@ class FriendsScreen extends ConsumerStatefulWidget {
   ConsumerState<FriendsScreen> createState() => _FriendsScreenState();
 }
 
-class _FriendsScreenState extends ConsumerState<FriendsScreen>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _FriendsScreenState extends ConsumerState<FriendsScreen> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+  bool _requestsExpanded = true;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _searchController.addListener(() {
+      setState(() => _searchQuery = _searchController.text.toLowerCase());
+    });
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final friendsAsync = ref.watch(friendsProvider);
+    final requestsAsync = ref.watch(pendingRequestsProvider);
+
     return Scaffold(
+      backgroundColor: Colors.grey[50],
       appBar: AppBar(
-        title: const Text('เพื่อน', style: TextStyle(color: Colors.black)),
+        title: const Text(
+          'รายชื่อเพื่อน',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.person_add_alt_1, color: Color(0xFF81CEF2)),
-            onPressed: () => _showAddFriendModal(context),
+        scrolledUnderElevation: 0,
+      ),
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(friendsProvider);
+          ref.invalidate(pendingRequestsProvider);
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const SizedBox(height: 16),
+
+              // Search bar + Add friend button row
+              _buildSearchRow(context),
+
+              const SizedBox(height: 20),
+
+              // Friend requests section (collapsible)
+              _buildFriendRequestsSection(requestsAsync),
+
+              // Friends list header
+              _buildFriendsHeader(friendsAsync),
+
+              const SizedBox(height: 12),
+
+              // Friends list
+              _buildFriendsList(friendsAsync),
+
+              // Bottom padding for FAB
+              const SizedBox(height: 80),
+            ],
           ),
-        ],
-        bottom: TabBar(
-          controller: _tabController,
-          labelColor: const Color(0xFF81CEF2),
-          unselectedLabelColor: Colors.grey,
-          indicatorColor: const Color(0xFF81CEF2),
-          tabs: const [
-            Tab(text: 'เพื่อนทั้งหมด'),
-            Tab(text: 'คำขอเป็นเพื่อน'),
-          ],
         ),
       ),
-      body: TabBarView(
-        controller: _tabController,
-        children: [
-          // All Friends Tab
-          _AllFriendsTab(),
-          // Friend Requests Tab
-          _FriendRequestsTab(),
-        ],
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.push('/groups/create'),
+        backgroundColor: const Color(0xFF81CEF2),
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text(
+          'สร้างกลุ่มใหม่',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
+    );
+  }
+
+  Widget _buildSearchRow(BuildContext context) {
+    return Row(
+      children: [
+        // Search bar
+        Expanded(
+          child: Container(
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.grey[100],
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'ค้นหาเพื่อน...',
+                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
+                prefixIcon: Icon(
+                  Icons.search,
+                  color: Colors.grey[400],
+                  size: 20,
+                ),
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        // Add friend button
+        GestureDetector(
+          onTap: () => _showAddFriendModal(context),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: const Color(0xFF81CEF2),
+              borderRadius: BorderRadius.circular(22),
+            ),
+            child: const Icon(
+              Icons.person_add_alt_1,
+              color: Colors.white,
+              size: 22,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFriendRequestsSection(
+    AsyncValue<PendingRequests> requestsAsync,
+  ) {
+    return requestsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (requests) {
+        if (requests.incoming.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          children: [
+            // Header with expand/collapse
+            GestureDetector(
+              onTap: () =>
+                  setState(() => _requestsExpanded = !_requestsExpanded),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'คำขอเป็นเพื่อน (${requests.incoming.length})',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Icon(
+                    _requestsExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: Colors.grey[600],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Request cards
+            if (_requestsExpanded)
+              ...requests.incoming.map(
+                (req) => _IncomingRequestCard(request: req),
+              ),
+            const SizedBox(height: 16),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildFriendsHeader(AsyncValue<List<Friend>> friendsAsync) {
+    final count = friendsAsync.value?.length ?? 0;
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'เพื่อนของคุณ ($count คน)',
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        IconButton(
+          onPressed: () {
+            // TODO: Show filter options
+          },
+          icon: Icon(Icons.tune, color: Colors.grey[600]),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFriendsList(AsyncValue<List<Friend>> friendsAsync) {
+    return friendsAsync.when(
+      loading: () => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(40),
+          child: CircularProgressIndicator(),
+        ),
+      ),
+      error: (err, _) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            children: [
+              const Icon(Icons.error_outline, size: 48, color: Colors.grey),
+              const SizedBox(height: 16),
+              Text('เกิดข้อผิดพลาด: $err'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => ref.invalidate(friendsProvider),
+                child: const Text('ลองอีกครั้ง'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      data: (friends) {
+        // Apply search filter
+        final filtered = _searchQuery.isEmpty
+            ? friends
+            : friends
+                  .where((f) => f.nickname.toLowerCase().contains(_searchQuery))
+                  .toList();
+
+        if (friends.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(40),
+              child: Column(
+                children: [
+                  Icon(Icons.people_outline, size: 64, color: Colors.grey[300]),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'ยังไม่มีเพื่อน',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'กดปุ่มเพิ่มเพื่อนเพื่อเริ่มต้น',
+                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        if (filtered.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(40),
+              child: Column(
+                children: [
+                  Icon(Icons.search_off, size: 48, color: Colors.grey[300]),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'ไม่พบเพื่อนที่ค้นหา',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return Column(
+          children: filtered
+              .map((friend) => _FriendCard(friend: friend))
+              .toList(),
+        );
+      },
     );
   }
 
@@ -68,69 +301,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen>
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => _AddFriendModal(),
-    );
-  }
-}
-
-class _AllFriendsTab extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final friendsAsync = ref.watch(friendsProvider);
-
-    return friendsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text('เกิดข้อผิดพลาด: $err'),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: () => ref.invalidate(friendsProvider),
-              child: const Text('ลองอีกครั้ง'),
-            ),
-          ],
-        ),
-      ),
-      data: (friends) {
-        if (friends.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.people_outline, size: 64, color: Colors.grey[300]),
-                const SizedBox(height: 16),
-                const Text(
-                  'ยังไม่มีเพื่อน',
-                  style: TextStyle(color: Colors.grey),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'กดปุ่ม + เพื่อเพิ่มเพื่อน',
-                  style: TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(friendsProvider);
-          },
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: friends.length,
-            itemBuilder: (context, index) {
-              final friend = friends[index];
-              return _FriendCard(friend: friend);
-            },
-          ),
-        );
-      },
+      builder: (context) => const AddFriendModal(),
     );
   }
 }
@@ -143,18 +314,34 @@ class _FriendCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isOwed = friend.balance > 0; // They owe you
-    final isOwe = friend.balance < 0; // You owe them
+
+    String balanceLabel;
+    String balanceAmount;
+    Color balanceColor;
+
+    if (friend.balance == 0) {
+      balanceLabel = 'ไม่มียอดค้างต่อกัน';
+      balanceAmount = '';
+      balanceColor = Colors.grey;
+    } else if (isOwed) {
+      balanceLabel = 'คุณรอรับเงิน';
+      balanceAmount = '+${friend.balance.abs().toStringAsFixed(2)}฿';
+      balanceColor = const Color(0xFF81CEF2);
+    } else {
+      balanceLabel = 'คุณค้างจ่าย';
+      balanceAmount = '-${friend.balance.abs().toStringAsFixed(2)}฿';
+      balanceColor = Colors.red;
+    }
 
     return Card(
       elevation: 0,
       color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
       margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
+          radius: 24,
           backgroundColor: const Color(0xFF81CEF2).withValues(alpha: 0.2),
           backgroundImage: friend.avatarUrl != null
               ? NetworkImage(friend.avatarUrl!)
@@ -164,127 +351,51 @@ class _FriendCard extends StatelessWidget {
                   friend.nickname.isNotEmpty
                       ? friend.nickname[0].toUpperCase()
                       : '?',
+                  style: const TextStyle(
+                    color: Color(0xFF81CEF2),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                  ),
                 )
               : null,
         ),
-        title: Text(
-          friend.nickname,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        title: Text(friend.nickname, style: const TextStyle(fontSize: 16)),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            if (friend.balance == 0)
-              const Text('เคลียร์กันแล้ว', style: TextStyle(color: Colors.grey))
-            else
-              Text(
-                isOwed
-                    ? 'ติดคุณ ฿${friend.balance.abs().toStringAsFixed(0)}'
-                    : 'คุณติด ฿${friend.balance.abs().toStringAsFixed(0)}',
-                style: TextStyle(
-                  color: isOwed
-                      ? Colors.green
-                      : (isOwe ? Colors.red : Colors.grey),
+            Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  balanceLabel,
+                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
                 ),
-              ),
-            Text(
-              '${friend.sharedTripsCount} กลุ่มร่วมกัน',
-              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                if (balanceAmount.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    balanceAmount,
+                    style: TextStyle(
+                      color: balanceColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              Icons.notifications_outlined,
+              color: const Color(0xFF81CEF2),
+              size: 24,
             ),
           ],
         ),
-        trailing: const Icon(Icons.chevron_right, color: Colors.grey),
         onTap: () {
           // TODO: Navigate to friend detail
         },
       ),
-    );
-  }
-}
-
-class _FriendRequestsTab extends ConsumerWidget {
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final requestsAsync = ref.watch(pendingRequestsProvider);
-
-    return requestsAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => Center(child: Text('เกิดข้อผิดพลาด: $err')),
-      data: (requests) {
-        if (requests.incoming.isEmpty && requests.outgoing.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.mail_outline, size: 64, color: Colors.grey[300]),
-                const SizedBox(height: 16),
-                const Text(
-                  'ไม่มีคำขอเป็นเพื่อน',
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ],
-            ),
-          );
-        }
-
-        return RefreshIndicator(
-          onRefresh: () async {
-            ref.invalidate(pendingRequestsProvider);
-          },
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              if (requests.incoming.isNotEmpty) ...[
-                Text(
-                  'คำขอเข้ามา (${requests.incoming.length})',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ...requests.incoming.map(
-                  (req) => _IncomingRequestCard(request: req),
-                ),
-              ],
-              if (requests.outgoing.isNotEmpty) ...[
-                const SizedBox(height: 16),
-                Text(
-                  'คำขอที่ส่ง (${requests.outgoing.length})',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                ...requests.outgoing.map((req) {
-                  final target = req['target'] as Map<String, dynamic>?;
-                  return Card(
-                    elevation: 0,
-                    color: Colors.grey[50],
-                    margin: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: Colors.grey[300],
-                        child: Text(
-                          target?['nickname']?.toString().isNotEmpty == true
-                              ? target!['nickname'][0].toUpperCase()
-                              : '?',
-                        ),
-                      ),
-                      title: Text(target?['nickname'] ?? 'Unknown'),
-                      subtitle: const Text(
-                        'รอการตอบรับ',
-                        style: TextStyle(color: Colors.orange),
-                      ),
-                    ),
-                  );
-                }),
-              ],
-            ],
-          ),
-        );
-      },
     );
   }
 }
@@ -360,11 +471,13 @@ class _IncomingRequestCardState extends ConsumerState<_IncomingRequestCard> {
       elevation: 0,
       color: Colors.white,
       margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
             CircleAvatar(
+              radius: 22,
               backgroundColor: const Color(0xFF81CEF2).withValues(alpha: 0.2),
               backgroundImage: widget.request.requesterAvatarUrl != null
                   ? NetworkImage(widget.request.requesterAvatarUrl!)
@@ -374,6 +487,10 @@ class _IncomingRequestCardState extends ConsumerState<_IncomingRequestCard> {
                       widget.request.requesterName.isNotEmpty
                           ? widget.request.requesterName[0].toUpperCase()
                           : '?',
+                      style: const TextStyle(
+                        color: Color(0xFF81CEF2),
+                        fontWeight: FontWeight.bold,
+                      ),
                     )
                   : null,
             ),
@@ -412,6 +529,9 @@ class _IncomingRequestCardState extends ConsumerState<_IncomingRequestCard> {
                   backgroundColor: const Color(0xFF81CEF2),
                   foregroundColor: Colors.white,
                   elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20),
+                  ),
                 ),
                 child: const Text('ยืนยัน'),
               ),
@@ -420,188 +540,5 @@ class _IncomingRequestCardState extends ConsumerState<_IncomingRequestCard> {
         ),
       ),
     );
-  }
-}
-
-class _AddFriendModal extends ConsumerStatefulWidget {
-  @override
-  ConsumerState<_AddFriendModal> createState() => _AddFriendModalState();
-}
-
-class _AddFriendModalState extends ConsumerState<_AddFriendModal> {
-  final _searchController = TextEditingController();
-  List<UserSearchResult> _searchResults = [];
-  bool _isSearching = false;
-  bool _isSending = false;
-
-  Future<void> _search() async {
-    if (_searchController.text.length < 3) return;
-
-    setState(() => _isSearching = true);
-    try {
-      final results = await ref
-          .read(friendServiceProvider)
-          .searchUsers(_searchController.text);
-      setState(() => _searchResults = results);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
-      }
-    } finally {
-      if (mounted) setState(() => _isSearching = false);
-    }
-  }
-
-  Future<void> _sendRequest(String userId) async {
-    setState(() => _isSending = true);
-    try {
-      await ref.read(friendServiceProvider).sendRequestById(userId);
-      ref.invalidate(pendingRequestsProvider);
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('ส่งคำขอเป็นเพื่อนแล้ว!')));
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('$e')));
-      }
-    } finally {
-      if (mounted) setState(() => _isSending = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-        left: 16,
-        right: 16,
-        top: 16,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'เพิ่มเพื่อน',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'ค้นหาด้วยอีเมลหรือชื่อ',
-              prefixIcon: const Icon(Icons.search),
-              border: const OutlineInputBorder(
-                borderRadius: BorderRadius.all(Radius.circular(12)),
-              ),
-              suffixIcon: _isSearching
-                  ? const Padding(
-                      padding: EdgeInsets.all(12),
-                      child: SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    )
-                  : IconButton(
-                      icon: const Icon(Icons.search),
-                      onPressed: _search,
-                    ),
-            ),
-            onSubmitted: (_) => _search(),
-          ),
-          const SizedBox(height: 16),
-          if (_searchResults.isNotEmpty)
-            ...(_searchResults.map(
-              (user) => ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: const Color(
-                    0xFF81CEF2,
-                  ).withValues(alpha: 0.2),
-                  backgroundImage: user.avatarUrl != null
-                      ? NetworkImage(user.avatarUrl!)
-                      : null,
-                  child: user.avatarUrl == null
-                      ? Text(
-                          user.nickname.isNotEmpty
-                              ? user.nickname[0].toUpperCase()
-                              : '?',
-                        )
-                      : null,
-                ),
-                title: Text(user.nickname),
-                subtitle: Text(user.email ?? ''),
-                trailing: _buildActionButton(user),
-              ),
-            ))
-          else if (_searchController.text.isNotEmpty && !_isSearching)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                'ไม่พบผู้ใช้',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey),
-              ),
-            ),
-          const SizedBox(height: 16),
-          OutlinedButton.icon(
-            onPressed: () {
-              // TODO: Scan QR Code
-            },
-            icon: const Icon(Icons.qr_code_scanner),
-            label: const Text('สแกน QR Code'),
-            style: OutlinedButton.styleFrom(padding: const EdgeInsets.all(16)),
-          ),
-          const SizedBox(height: 32),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActionButton(UserSearchResult user) {
-    if (user.friendshipStatus == 'accepted') {
-      return const Text(
-        'เป็นเพื่อนแล้ว',
-        style: TextStyle(color: Colors.green),
-      );
-    } else if (user.friendshipStatus == 'pending') {
-      return Text(
-        user.isPendingFromMe ? 'รอตอบรับ' : 'มีคำขอ',
-        style: const TextStyle(color: Colors.orange),
-      );
-    } else {
-      return ElevatedButton(
-        onPressed: _isSending ? null : () => _sendRequest(user.id),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF81CEF2),
-          foregroundColor: Colors.white,
-        ),
-        child: _isSending
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.white,
-                ),
-              )
-            : const Text('เพิ่ม'),
-      );
-    }
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
   }
 }

@@ -46,7 +46,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             Align(
               alignment: Alignment.topRight,
               child: TextButton(
-                onPressed: () => context.go('/login'),
+                onPressed: () => context.go('/welcome'),
                 child: const Text('ข้าม', style: TextStyle(color: Colors.grey)),
               ),
             ),
@@ -139,7 +139,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           curve: Curves.easeIn,
                         );
                       } else {
-                        context.go('/login');
+                        context.go('/welcome');
                       }
                     },
                   ),

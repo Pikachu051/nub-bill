@@ -3,6 +3,7 @@ import 'package:nubbill/config/api_config.dart';
 import 'package:nubbill/models/trip_model.dart';
 import 'package:nubbill/models/trip_member_model.dart';
 import 'package:nubbill/models/balance_entry_model.dart';
+import 'package:nubbill/models/debt_entry_model.dart';
 
 /// Provider for TripService
 final tripServiceProvider = Provider<TripService>((ref) {
@@ -31,6 +32,15 @@ final tripBalancesProvider = FutureProvider.family<List<BalanceEntry>, String>((
 ) async {
   final service = ref.read(tripServiceProvider);
   return service.getTripBalances(tripId);
+});
+
+/// Provider for simplified pairwise debts
+final tripDebtsProvider = FutureProvider.family<List<DebtEntry>, String>((
+  ref,
+  tripId,
+) async {
+  final service = ref.read(tripServiceProvider);
+  return service.getTripDebts(tripId);
 });
 
 /// Trip detail response containing trip, members, and role
@@ -90,13 +100,18 @@ class TripService {
   }) async {
     final body = <String, dynamic>{'name': name};
 
-    if (category != null) body['category'] = category;
-    if (startDate != null)
+    if (category != null) {
+      body['category'] = category;
+    }
+    if (startDate != null) {
       body['start_date'] = startDate.toIso8601String().split('T')[0];
-    if (endDate != null)
+    }
+    if (endDate != null) {
       body['end_date'] = endDate.toIso8601String().split('T')[0];
-    if (memberIds != null && memberIds.isNotEmpty)
+    }
+    if (memberIds != null && memberIds.isNotEmpty) {
       body['member_ids'] = memberIds;
+    }
 
     final response = await _client.post('/trips', body: body);
 
@@ -139,12 +154,18 @@ class TripService {
   }) async {
     final body = <String, dynamic>{};
 
-    if (name != null) body['name'] = name;
-    if (category != null) body['category'] = category;
-    if (startDate != null)
+    if (name != null) {
+      body['name'] = name;
+    }
+    if (category != null) {
+      body['category'] = category;
+    }
+    if (startDate != null) {
       body['start_date'] = startDate.toIso8601String().split('T')[0];
-    if (endDate != null)
+    }
+    if (endDate != null) {
       body['end_date'] = endDate.toIso8601String().split('T')[0];
+    }
 
     final response = await _client.patch('/trips/$tripId', body: body);
 
@@ -175,6 +196,20 @@ class TripService {
     final data = response.data as List<dynamic>;
     return data
         .map((e) => BalanceEntry.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// GET /api/trips/:id/debts - Get simplified pairwise debts
+  Future<List<DebtEntry>> getTripDebts(String tripId) async {
+    final response = await _client.get('/trips/$tripId/debts');
+
+    if (!response.isSuccess || response.data == null) {
+      throw Exception(response.error ?? 'Failed to load debts');
+    }
+
+    final data = response.data as List<dynamic>;
+    return data
+        .map((e) => DebtEntry.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
@@ -212,5 +247,20 @@ class TripService {
     if (!response.isSuccess) {
       throw Exception(response.error ?? 'Failed to leave trip');
     }
+  }
+
+  /// POST /api/trips/:id/cover - Upload trip cover image
+  Future<String> uploadCover(String tripId, List<int> imageBytes) async {
+    final response = await _client.uploadFile(
+      '/trips/$tripId/cover',
+      imageBytes,
+      'cover.jpg',
+    );
+
+    if (!response.isSuccess || response.data == null) {
+      throw Exception(response.error ?? 'Failed to upload cover');
+    }
+
+    return response.data['cover_url'] as String;
   }
 }

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/screens/verification_page.dart';
-import 'package:nubbill/screens/login_page.dart';
 import 'package:nubbill/widgets/rounded_button.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -38,11 +38,28 @@ class _RegisterPageState extends State<RegisterPage> {
       final password = _passwordController.text;
 
       // Sign up with email - Supabase will send OTP email automatically
-      await SupabaseConfig.client.auth.signUp(
+      final response = await SupabaseConfig.client.auth.signUp(
         email: email,
         password: password,
         data: {'nickname': nickname},
       );
+
+      // Check if user already exists (Supabase returns empty identities)
+      if (response.user != null &&
+          (response.user!.identities == null ||
+              response.user!.identities!.isEmpty)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'อีเมลนี้มีบัญชีอยู่แล้ว กรุณาไปที่หน้าเข้าสู่ระบบ',
+              ),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
 
       if (mounted) {
         // Navigate to verification page with email
@@ -277,14 +294,7 @@ class _RegisterPageState extends State<RegisterPage> {
                   const Text("มีบัญชีอยู่แล้ว?"),
                   const SizedBox(width: 5),
                   GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const LoginPage(),
-                        ),
-                      );
-                    },
+                    onTap: () => context.push('/login'),
                     child: const Text(
                       'ลงชื่อเข้าใช้',
                       style: TextStyle(

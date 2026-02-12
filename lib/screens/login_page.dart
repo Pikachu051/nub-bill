@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/widgets/rounded_button.dart';
-import 'package:nubbill/screens/register_page.dart';
-import 'package:nubbill/screens/home_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -40,17 +39,14 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (mounted) {
-        // Successfully signed in - navigate to home
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (_) => const HomePage()),
-          (route) => false, // Remove all previous routes
-        );
+        // Successfully signed in - GoRouter will redirect to /home via auth state
+        context.go('/home');
       }
     } on AuthException catch (e) {
       if (mounted) {
+        final thaiMessage = _getThaiAuthError(e.message);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message), backgroundColor: Colors.red),
+          SnackBar(content: Text(thaiMessage), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
@@ -67,6 +63,27 @@ class _LoginPageState extends State<LoginPage> {
         setState(() => _isLoading = false);
       }
     }
+  }
+
+  String _getThaiAuthError(String message) {
+    final lower = message.toLowerCase();
+    if (lower.contains('invalid login credentials') ||
+        lower.contains('invalid_credentials')) {
+      return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+    }
+    if (lower.contains('email not confirmed') ||
+        lower.contains('not confirmed')) {
+      return 'อีเมลยังไม่ได้ยืนยัน กรุณาตรวจสอบอีเมลของคุณ';
+    }
+    if (lower.contains('too many requests') || lower.contains('rate limit')) {
+      return 'ลองเข้าสู่ระบบมากเกินไป กรุณารอสักครู่';
+    }
+    if (lower.contains('network') ||
+        lower.contains('socket') ||
+        lower.contains('connection')) {
+      return 'ไม่สามารถเชื่อมต่อได้ กรุณาตรวจสอบอินเทอร์เน็ต';
+    }
+    return 'เกิดข้อผิดพลาด: $message';
   }
 
   @override
@@ -198,14 +215,7 @@ class _LoginPageState extends State<LoginPage> {
               Align(
                 alignment: Alignment.centerRight,
                 child: GestureDetector(
-                  onTap: () {
-                    // TODO: Implement forgot password
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('ฟีเจอร์นี้ยังไม่พร้อมใช้งาน'),
-                      ),
-                    );
-                  },
+                  onTap: () => context.push('/forgot-password'),
                   child: const Text(
                     'จำรหัสผ่านไม่ได้?',
                     style: TextStyle(color: Color.fromARGB(255, 129, 206, 242)),
@@ -242,14 +252,7 @@ class _LoginPageState extends State<LoginPage> {
                   const Text("ยังไม่มีบัญชี?"),
                   const SizedBox(width: 5),
                   GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const RegisterPage(),
-                        ),
-                      );
-                    },
+                    onTap: () => context.push('/register'),
                     child: const Text(
                       'สมัครบัญชีใหม่',
                       style: TextStyle(

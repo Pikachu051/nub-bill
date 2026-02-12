@@ -1,0 +1,10 @@
+Analyzing create_group_screen.dart...                           
+
+   info - Unnecessary use of multiple underscores - lib\screens\create_group_screen.dart:394:53 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\screens\create_group_screen.dart:394:57 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\screens\create_group_screen.dart:534:53 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores - lib\screens\create_group_screen.dart:534:57 - unnecessary_underscores
+  error - The argument type 'num' can't be assigned to the parameter type 'double'.  - lib\screens\create_group_screen.dart:645:71 - argument_type_not_assignable
+  error - A value of type 'num' can't be assigned to a variable of type 'double' - lib\screens\create_group_screen.dart:648:20 - invalid_assignment
+
+6 issues found. (ran in 1.0s)

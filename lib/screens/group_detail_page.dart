@@ -7,7 +7,9 @@ import 'package:nubbill/services/expense_service.dart';
 import 'package:nubbill/services/realtime_service.dart';
 import 'package:nubbill/models/trip_model.dart';
 import 'package:nubbill/models/trip_member_model.dart';
-import 'package:nubbill/models/balance_entry_model.dart';
+import 'package:nubbill/models/expense_model.dart';
+import 'package:nubbill/models/debt_entry_model.dart';
+import 'package:nubbill/config/supabase_config.dart';
 
 class GroupDetailPage extends ConsumerStatefulWidget {
   final String groupId;
@@ -23,11 +25,12 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
   late TabController _tabController;
   StreamSubscription? _expenseSubscription;
 
-  // Local state for animated list
-  final GlobalKey<AnimatedListState> _expenseListKey =
-      GlobalKey<AnimatedListState>();
-  List<dynamic> _expenses = [];
+  // Local state for bill list
+  List<Expense> _expenses = [];
   bool _isInitialLoad = true;
+
+  /// Current user's member ID in this trip
+  String? _myMemberId;
 
   @override
   void initState() {
@@ -36,12 +39,23 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
 
     // Subscribe to realtime expense updates after build
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadInitialExpenses();
+      _loadInitialData();
       _subscribeToRealtimeUpdates();
     });
   }
 
-  Future<void> _loadInitialExpenses() async {
+  Future<void> _loadInitialData() async {
+    // Load trip detail to get myMemberId
+    final tripDetail = await ref.read(
+      tripDetailProvider(widget.groupId).future,
+    );
+    if (mounted && tripDetail != null) {
+      setState(() {
+        _myMemberId = tripDetail.myMemberId;
+      });
+    }
+
+    // Load expenses
     final expenses = await ref.read(
       tripExpensesProvider(widget.groupId).future,
     );
@@ -61,57 +75,30 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       onEvent: (event) {
         switch (event.type) {
           case RealtimeEventType.insert:
-            if (event.newRecord != null) {
-              _addExpenseWithAnimation(event.newRecord!);
-            }
-            break;
           case RealtimeEventType.update:
-            if (event.newRecord != null) {
-              _updateExpense(event.newRecord!);
-            }
-            break;
           case RealtimeEventType.delete:
-            if (event.oldRecord != null) {
-              _removeExpenseWithAnimation(event.oldRecord!['id']);
-            }
+            // On any change, reload all expenses to get full join data
+            _reloadExpenses();
             break;
         }
-        // Silently refresh balances (no loading state, just update)
+        // Refresh debts and balances
+        ref.invalidate(tripDebtsProvider(widget.groupId));
         ref.invalidate(tripBalancesProvider(widget.groupId));
       },
     );
   }
 
-  void _addExpenseWithAnimation(Map<String, dynamic> expense) {
-    // Insert at the beginning (newest first)
-    _expenses.insert(0, expense);
-    _expenseListKey.currentState?.insertItem(
-      0,
-      duration: const Duration(milliseconds: 300),
-    );
-  }
-
-  void _updateExpense(Map<String, dynamic> updatedExpense) {
-    final index = _expenses.indexWhere((e) => e['id'] == updatedExpense['id']);
-    if (index != -1 && mounted) {
-      setState(() {
-        _expenses[index] = updatedExpense;
-      });
-    }
-  }
-
-  void _removeExpenseWithAnimation(String expenseId) {
-    final index = _expenses.indexWhere((e) => e['id'] == expenseId);
-    if (index != -1) {
-      final removedExpense = _expenses[index];
-      _expenses.removeAt(index);
-      _expenseListKey.currentState?.removeItem(
-        index,
-        (context, animation) =>
-            _buildAnimatedExpenseCard(removedExpense, animation),
-        duration: const Duration(milliseconds: 300),
-      );
-    }
+  Future<void> _reloadExpenses() async {
+    try {
+      final expenses = await ref
+          .read(expenseServiceProvider)
+          .getTripExpenses(widget.groupId);
+      if (mounted) {
+        setState(() {
+          _expenses = expenses;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -124,8 +111,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
   @override
   Widget build(BuildContext context) {
     final tripDetailAsync = ref.watch(tripDetailProvider(widget.groupId));
-    final balancesAsync = ref.watch(tripBalancesProvider(widget.groupId));
-    // Note: expensesAsync removed - expenses are managed locally for animations
+    final debtsAsync = ref.watch(tripDebtsProvider(widget.groupId));
 
     return tripDetailAsync.when(
       loading: () =>
@@ -145,6 +131,11 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
         final trip = detail.trip;
         final members = detail.members;
 
+        // Store myMemberId from trip detail
+        if (_myMemberId == null && detail.myMemberId != null) {
+          _myMemberId = detail.myMemberId;
+        }
+
         return Scaffold(
           backgroundColor: Colors.grey[50],
           body: NestedScrollView(
@@ -160,8 +151,8 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                       unselectedLabelColor: Colors.grey,
                       indicatorColor: const Color(0xFF81CEF2),
                       tabs: const [
-                        Tab(text: 'ยอดรวม'),
-                        Tab(text: 'ใครติดใคร'),
+                        Tab(text: 'รายการทั้งหมด'),
+                        Tab(text: 'ใครติดเงินใคร'),
                       ],
                     ),
                   ),
@@ -172,17 +163,18 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
             body: TabBarView(
               controller: _tabController,
               children: [
-                // Tab 1: Expenses Summary (uses local state with animations)
+                // Tab 1: Bill list
                 _buildExpensesTab(),
-                // Tab 2: Who Owes Who
-                _buildBalancesTab(balancesAsync),
+                // Tab 2: Who Owes Who (pairwise debts)
+                _buildDebtsTab(debtsAsync),
               ],
             ),
           ),
           floatingActionButton: FloatingActionButton.extended(
-            onPressed: () {
+            heroTag: 'addBillFab',
+            onPressed: () async {
               // Navigate to add expense with trip context
-              context.push(
+              final result = await context.push<bool>(
                 '/add_expense',
                 extra: {
                   'tripId': widget.groupId,
@@ -190,12 +182,19 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                   'members': members,
                 },
               );
+              if (result == true) {
+                _reloadExpenses();
+                ref.invalidate(tripDebtsProvider(widget.groupId));
+              }
             },
             backgroundColor: const Color(0xFF81CEF2),
-            icon: const Icon(Icons.add, color: Colors.white),
+            icon: const Icon(Icons.receipt_long, color: Colors.white),
             label: const Text(
               'เพิ่มบิล',
-              style: TextStyle(color: Colors.white),
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         );
@@ -205,17 +204,75 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
 
   Widget _buildSliverAppBar(Trip trip) {
     return SliverAppBar(
-      expandedHeight: 200.0,
+      expandedHeight: 240.0,
       pinned: true,
+      stretch: true,
       backgroundColor: const Color(0xFF81CEF2),
-      flexibleSpace: FlexibleSpaceBar(
-        title: Text(
-          trip.name,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
+      centerTitle: true,
+      leading: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.4),
+            shape: BoxShape.circle,
+          ),
+          child: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            onPressed: () {
+              Navigator.of(context).maybePop();
+            },
           ),
         ),
+      ),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.all(8.0),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.4),
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              icon: const Icon(Icons.settings, color: Colors.white),
+              onPressed: () {
+                // Trip settings
+              },
+            ),
+          ),
+        ),
+      ],
+      flexibleSpace: FlexibleSpaceBar(
+        collapseMode: CollapseMode.parallax,
+        stretchModes: const [
+          StretchMode.zoomBackground,
+          StretchMode.fadeTitle,
+        ],
+        title: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              trip.name,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            if (trip.balance != 0)
+              Text(
+                'สถานะ: ${trip.balance >= 0 ? "รอรับเงิน" : "ค้างจ่าย"} ${trip.balance.abs().toStringAsFixed(2)}฿',
+                style: TextStyle(
+                  color: trip.balance >= 0
+                      ? Colors.greenAccent
+                      : Colors.redAccent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+          ],
+        ),
+        titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
         background: Stack(
           fit: StackFit.expand,
           children: [
@@ -249,29 +306,120 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
-                    Colors.black.withValues(alpha: 0.5),
+                    Colors.black.withValues(alpha: 0.7),
                   ],
                 ),
+              ),
+            ),
+            // Trip Info Badges
+            Positioned(
+              bottom: 70, // Above the title area when expanded
+              left: 16,
+              right: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${trip.memberCount} คน',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF8C9E6C), // Muted green
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              trip.category.icon, // Use category icon
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              trip.category.displayName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      if (trip.startDate != null)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.calendar_today,
+                                color: Colors.white,
+                                size: 14,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatDateRange(trip.startDate!, trip.endDate),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
         ),
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.share, color: Colors.white),
-          onPressed: () {
-            // Share join code
-            _showJoinCodeDialog(trip.joinCode);
-          },
-        ),
-        IconButton(
-          icon: const Icon(Icons.settings, color: Colors.white),
-          onPressed: () {
-            // Trip settings
-          },
-        ),
-      ],
     );
   }
 
@@ -281,36 +429,6 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Members Row
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                ...members.take(5).map((m) => _buildMemberAvatar(m)),
-                if (members.length > 5)
-                  CircleAvatar(
-                    radius: 20,
-                    backgroundColor: Colors.grey[300],
-                    child: Text(
-                      '+${members.length - 5}',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-                const SizedBox(width: 8),
-                GestureDetector(
-                  onTap: () {
-                    // Add member
-                  },
-                  child: CircleAvatar(
-                    radius: 20,
-                    backgroundColor: Colors.grey[200],
-                    child: const Icon(Icons.add, size: 20, color: Colors.grey),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
           // Personal Balance Card
           Container(
             padding: const EdgeInsets.all(16),
@@ -325,21 +443,32 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                 ),
               ],
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'ยอดของคุณ',
-                      style: TextStyle(color: Colors.grey),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'สถานะกระเป๋าตังค์',
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          trip.balance >= 0 ? 'รอรับเงิน' : 'ค้างจ่าย',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: trip.balance >= 0
+                                ? Colors.green
+                                : Colors.red,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
                     Text(
-                      trip.balance >= 0
-                          ? '+฿${trip.balance.abs().toStringAsFixed(0)}'
-                          : '-฿${trip.balance.abs().toStringAsFixed(0)}',
+                      '${trip.balance >= 0 ? "" : "- "}${trip.balance.abs().toStringAsFixed(2)}฿',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
@@ -348,12 +477,43 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                     ),
                   ],
                 ),
-                Text(
-                  trip.balance >= 0 ? 'รับคืน' : 'ต้องจ่าย',
-                  style: TextStyle(
-                    color: trip.balance >= 0 ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.w500,
-                  ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          context.push('/payment');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF81CEF2),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        icon: const Icon(Icons.camera_alt, size: 18),
+                        label: const Text('จัดการยอดเงิน'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      decoration: BoxDecoration(
+                        border: Border.all(color: const Color(0xFF81CEF2)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: IconButton(
+                        onPressed: () {
+                          // Show chart/summary
+                        },
+                        icon: const Icon(
+                          Icons.bar_chart,
+                          color: Color(0xFF81CEF2),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -363,43 +523,18 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     );
   }
 
-  Widget _buildMemberAvatar(TripMember member) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8.0),
-      child: Column(
-        children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundColor: const Color(0xFF81CEF2).withValues(alpha: 0.2),
-            backgroundImage: member.avatarUrl != null
-                ? NetworkImage(member.avatarUrl!)
-                : null,
-            child: member.avatarUrl == null
-                ? Text(
-                    member.displayName.isNotEmpty
-                        ? member.displayName[0].toUpperCase()
-                        : '?',
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  )
-                : null,
-          ),
-          const SizedBox(height: 4),
-          SizedBox(
-            width: 50,
-            child: Text(
-              member.displayName,
-              style: const TextStyle(fontSize: 10),
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ],
-      ),
-    );
+  String _formatDateRange(DateTime start, DateTime? end) {
+    final startStr = '${start.day}/${start.month}/${start.year + 543}';
+    if (end == null) return startStr;
+    final endStr = '${end.day}/${end.month}/${end.year + 543}';
+    return '$startStr - $endStr';
   }
 
+  // =========================================================================
+  // Tab 1: Bill List
+  // =========================================================================
+
   Widget _buildExpensesTab() {
-    // Show loading only on initial load
     if (_isInitialLoad) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -417,218 +552,492 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       );
     }
 
-    return AnimatedList(
-      key: _expenseListKey,
+    // Group expenses by date
+    return ListView.builder(
       padding: const EdgeInsets.all(16),
-      initialItemCount: _expenses.length,
-      itemBuilder: (context, index, animation) {
-        if (index >= _expenses.length) return const SizedBox.shrink();
+      itemCount: _expenses.length,
+      itemBuilder: (context, index) {
         final expense = _expenses[index];
-        return _buildAnimatedExpenseCard(expense, animation);
-      },
-    );
-  }
 
-  Widget _buildAnimatedExpenseCard(
-    dynamic expense,
-    Animation<double> animation,
-  ) {
-    return SlideTransition(
-      position: animation.drive(
-        Tween<Offset>(
-          begin: const Offset(1, 0), // Slide from right
-          end: Offset.zero,
-        ).chain(CurveTween(curve: Curves.easeOutCubic)),
-      ),
-      child: FadeTransition(
-        opacity: animation,
-        child: _buildExpenseCard(expense),
-      ),
-    );
-  }
-
-  Widget _buildExpenseCard(dynamic expense) {
-    // Parse expense data
-    final description = expense['description'] ?? 'ไม่มีรายละเอียด';
-    final amount = (expense['amount'] as num?)?.toDouble() ?? 0;
-    final date =
-        DateTime.tryParse(expense['expense_date'] ?? '') ?? DateTime.now();
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
-      child: ListTile(
-        leading: CircleAvatar(
-          backgroundColor: const Color(0xFF81CEF2).withValues(alpha: 0.1),
-          child: const Icon(Icons.receipt, color: Color(0xFF81CEF2)),
-        ),
-        title: Text(
-          description,
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text('${date.day}/${date.month}/${date.year}'),
-        trailing: Text(
-          '฿${amount.toStringAsFixed(0)}',
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
-        onTap: () {
-          context.push('/bill_details', extra: expense);
-        },
-      ),
-    );
-  }
-
-  Widget _buildBalancesTab(AsyncValue<List<BalanceEntry>> balancesAsync) {
-    return balancesAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => Center(child: Text('เกิดข้อผิดพลาด: $err')),
-      data: (balances) {
-        if (balances.isEmpty) {
-          return const Center(
-            child: Text(
-              'ไม่มียอดค้างชำระ',
-              style: TextStyle(color: Colors.grey),
-            ),
-          );
+        // Show date header if first item or different date from previous
+        Widget? dateHeader;
+        final currentDate = _parseExpenseDate(expense.expenseDate);
+        if (index == 0) {
+          dateHeader = _buildDateHeader(currentDate);
+        } else {
+          final prevDate = _parseExpenseDate(_expenses[index - 1].expenseDate);
+          if (!_isSameDay(currentDate, prevDate)) {
+            dateHeader = _buildDateHeader(currentDate);
+          }
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: balances.length,
-          itemBuilder: (context, index) {
-            final entry = balances[index];
-            return _buildBalanceCard(entry);
-          },
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (dateHeader != null) dateHeader,
+            _buildExpenseCard(expense),
+          ],
         );
       },
     );
   }
 
-  Widget _buildBalanceCard(BalanceEntry entry) {
-    final isPositive = entry.net > 0;
+  DateTime _parseExpenseDate(String dateStr) {
+    return DateTime.tryParse(dateStr) ?? DateTime.now();
+  }
+
+  bool _isSameDay(DateTime a, DateTime b) {
+    return a.year == b.year && a.month == b.month && a.day == b.day;
+  }
+
+  Widget _buildDateHeader(DateTime date) {
+    // Format Thai-style date
+    final thaiMonths = [
+      '',
+      'มกราคม',
+      'กุมภาพันธ์',
+      'มีนาคม',
+      'เมษายน',
+      'พฤษภาคม',
+      'มิถุนายน',
+      'กรกฎาคม',
+      'สิงหาคม',
+      'กันยายน',
+      'ตุลาคม',
+      'พฤศจิกายน',
+      'ธันวาคม',
+    ];
+    final thaiYear = date.year + 543;
+    final dateText = '${date.day} ${thaiMonths[date.month]} $thaiYear';
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8, bottom: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            dateText,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+              color: Colors.black87,
+            ),
+          ),
+          Icon(Icons.tune, size: 20, color: Colors.grey[400]),
+        ],
+      ),
+    );
+  }
+
+  /// Determine status label for a bill relative to the current user
+  _BillStatus _getBillStatus(Expense expense) {
+    final myId = _myMemberId;
+    if (myId == null) {
+      return _BillStatus.notInvolved;
+    }
+
+    // Find user's split in this expense
+    final mySplit = expense.splits.where((s) => s.memberId == myId);
+
+    // User is the payer
+    final isPayer = expense.payerId == myId;
+
+    if (mySplit.isEmpty && !isPayer) {
+      return _BillStatus.notInvolved;
+    }
+
+    // If user has a split, check its status
+    if (mySplit.isNotEmpty) {
+      final split = mySplit.first;
+      if (split.status == 'paid') {
+        return _BillStatus.cleared;
+      }
+      // User owes money (not the payer and has unpaid split)
+      if (!isPayer) {
+        return _BillStatus.youOwe;
+      }
+    }
+
+    // User is payer — check if others have unpaid splits
+    final unpaidSplits = expense.splits.where(
+      (s) => s.memberId != myId && s.status != 'paid',
+    );
+    if (unpaidSplits.isNotEmpty) {
+      return _BillStatus.othersOweYou;
+    }
+
+    return _BillStatus.cleared;
+  }
+
+  Widget _buildExpenseCard(Expense expense) {
+    final status = _getBillStatus(expense);
+
+    // Find user's specific owe amount
+    double? userOweAmount;
+    if (status == _BillStatus.youOwe && _myMemberId != null) {
+      final mySplit = expense.splits.where((s) => s.memberId == _myMemberId);
+      if (mySplit.isNotEmpty) {
+        userOweAmount = mySplit.first.amount;
+      }
+    }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
       color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(color: Colors.grey.shade200),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 24,
-              backgroundColor: const Color(0xFF81CEF2).withValues(alpha: 0.2),
-              backgroundImage: entry.avatarUrl != null
-                  ? NetworkImage(entry.avatarUrl!)
-                  : null,
-              child: entry.avatarUrl == null
-                  ? Text(
-                      entry.displayName.isNotEmpty
-                          ? entry.displayName[0].toUpperCase()
-                          : '?',
-                    )
-                  : null,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    entry.displayName,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    isPositive ? 'ติดคุณ' : 'คุณติด',
-                    style: TextStyle(
-                      color: isPositive ? Colors.green : Colors.red,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '฿${entry.net.abs().toStringAsFixed(0)}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                    color: isPositive ? Colors.green : Colors.red,
-                  ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () async {
+          final result = await context.push('/expenses/${expense.id}');
+          if (result == true) {
+            _reloadExpenses();
+            ref.invalidate(tripDebtsProvider(widget.groupId));
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              // Category icon
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: expense.categoryColor,
+                  shape: BoxShape.circle,
                 ),
-                if (entry.net != 0)
-                  TextButton(
-                    onPressed: () {
-                      // Navigate to payment
-                      context.push(
-                        '/payment',
-                        extra: {
-                          'amount': entry.net.abs(),
-                          'memberId': entry.memberId,
-                        },
-                      );
-                    },
-                    child: Text(
-                      isPositive ? 'เตือนเพื่อน' : 'จ่ายเงิน',
-                      style: const TextStyle(fontSize: 12),
+                child: Icon(
+                  expense.categoryIcon,
+                  size: 22,
+                  color: Colors.black54,
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Description & subtitle
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      expense.description,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
-              ],
-            ),
-          ],
+                    const SizedBox(height: 2),
+                    Text(
+                      'แบบจ่าย ${expense.amount.toStringAsFixed(2)}฿',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                    ),
+                  ],
+                ),
+              ),
+              // Status label
+              _buildStatusLabel(
+                status,
+                userOweAmount,
+                expense.amount,
+                expense.payer?.displayName,
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  void _showJoinCodeDialog(String joinCode) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('รหัสเข้าร่วมกลุ่ม'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+  Widget _buildStatusLabel(
+    _BillStatus status,
+    double? userOweAmount,
+    double totalAmount,
+    String? payerName,
+  ) {
+    switch (status) {
+      case _BillStatus.youOwe:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                joinCode,
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 4,
-                ),
+            Text(
+              'คุณค้างจ่าย',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.red[400],
+                fontWeight: FontWeight.w500,
               ),
             ),
-            const SizedBox(height: 16),
-            const Text('แชร์รหัสนี้ให้เพื่อนเพื่อเข้าร่วมกลุ่ม'),
+            if (userOweAmount != null)
+              Text(
+                '${userOweAmount.toStringAsFixed(2)}฿',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.red[400],
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
           ],
+        );
+      case _BillStatus.othersOweYou:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              'คุณรอรับเงิน',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.green[600],
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            Text(
+              '${totalAmount.toStringAsFixed(2)}฿',
+              style: TextStyle(
+                fontSize: 15,
+                color: Colors.green[600],
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        );
+      case _BillStatus.cleared:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              '${totalAmount.toStringAsFixed(2)}฿',
+              style: const TextStyle(
+                fontSize: 14,
+                color: Colors.black87,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            Text(
+              '${payerName ?? "เพื่อน"}จ่ายคืน คุณ แล้ว',
+              style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+            ),
+          ],
+        );
+      case _BillStatus.notInvolved:
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              'คุณไม่มีส่วนเกี่ยวข้อง',
+              style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+            ),
+            if (payerName != null && payerName != 'Unknown')
+              Text(
+                'จ่ายโดย $payerName',
+                style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+              ),
+          ],
+        );
+    }
+  }
+
+  // =========================================================================
+  // Tab 2: Who Owes Who (Debt Simplification)
+  // =========================================================================
+
+  Widget _buildDebtsTab(AsyncValue<List<DebtEntry>> debtsAsync) {
+    return debtsAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (err, _) => Center(child: Text('เกิดข้อผิดพลาด: $err')),
+      data: (debts) {
+        if (debts.isEmpty) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 64,
+                  color: Colors.green[300],
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'ไม่มียอดค้างชำระ',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ],
+            ),
+          );
+        }
+
+        // Get current user ID to separate "my debts" from "others' debts"
+        final currentUserId = SupabaseConfig.client.auth.currentUser?.id;
+
+        // Separate: my debts vs others
+        final myDebts = debts
+            .where(
+              (d) =>
+                  d.fromUserId == currentUserId || d.toUserId == currentUserId,
+            )
+            .toList();
+        final otherDebts = debts
+            .where(
+              (d) =>
+                  d.fromUserId != currentUserId && d.toUserId != currentUserId,
+            )
+            .toList();
+
+        return ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            if (myDebts.isNotEmpty) ...[
+              _buildDebtSectionHeader('รายการของฉัน'),
+              const SizedBox(height: 8),
+              ...myDebts.map((d) => _buildDebtCard(d, currentUserId)),
+              const SizedBox(height: 16),
+            ],
+            if (otherDebts.isNotEmpty) ...[
+              _buildDebtSectionHeader('เพื่อนคนอื่น'),
+              const SizedBox(height: 8),
+              ...otherDebts.map((d) => _buildDebtCard(d, currentUserId)),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildDebtSectionHeader(String title) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('ปิด'),
+        Icon(Icons.tune, size: 20, color: Colors.grey[400]),
+      ],
+    );
+  }
+
+  Widget _buildDebtCard(DebtEntry debt, String? currentUserId) {
+    final iOwe = debt.fromUserId == currentUserId;
+    final theyOweMe = debt.toUserId == currentUserId;
+
+    // Determine display info
+    String displayName;
+    String? avatarUrl;
+    String statusText;
+    Color statusColor;
+
+    if (iOwe) {
+      displayName = debt.toName;
+      avatarUrl = debt.toAvatarUrl;
+      statusText = 'คุณค้างจ่าย ${debt.amount.toStringAsFixed(2)}฿';
+      statusColor = Colors.red;
+    } else if (theyOweMe) {
+      displayName = debt.fromName;
+      avatarUrl = debt.fromAvatarUrl;
+      statusText = 'คุณรอรับเงิน ${debt.amount.toStringAsFixed(2)}฿';
+      statusColor = Colors.green;
+    } else {
+      displayName = debt.fromName;
+      avatarUrl = debt.fromAvatarUrl;
+      statusText = 'ค้างจ่าย ${debt.toName} ${debt.amount.toStringAsFixed(2)}฿';
+      statusColor = Colors.grey;
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () {
+          if (iOwe) {
+            // Navigate to payment
+            context.push(
+              '/payment',
+              extra: {'amount': debt.amount, 'memberId': debt.toMemberId},
+            );
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: const Color(0xFF81CEF2).withValues(alpha: 0.2),
+                backgroundImage: avatarUrl != null
+                    ? NetworkImage(avatarUrl)
+                    : null,
+                child: avatarUrl == null
+                    ? Text(
+                        displayName.isNotEmpty
+                            ? displayName[0].toUpperCase()
+                            : '?',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      displayName,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      statusText,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: statusColor,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (iOwe || theyOweMe)
+                Icon(Icons.chevron_right, color: Colors.grey[400]),
+              if (theyOweMe)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4),
+                  child: Icon(
+                    Icons.notifications_active,
+                    size: 20,
+                    color: const Color(0xFF81CEF2),
+                  ),
+                ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
+
+  // =========================================================================
+  // Dialogs
+  // =========================================================================
+}
+
+/// Bill status for current user
+enum _BillStatus {
+  youOwe, // You have unpaid split
+  othersOweYou, // You're the payer and others haven't paid
+  cleared, // All cleared
+  notInvolved, // You're not part of this bill
 }
 
 // Helper delegate for sticky TabBar
@@ -649,7 +1058,26 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return Container(color: Colors.white, child: _tabBar);
+    return Container(
+      color: Colors.transparent,
+      child: Transform.translate(
+        offset: const Offset(0, -16),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 12,
+                offset: const Offset(0, -2),
+              ),
+            ],
+          ),
+          child: _tabBar,
+        ),
+      ),
+    );
   }
 
   @override

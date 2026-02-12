@@ -1,17 +1,27 @@
 /// API Configuration for Nub-Bill Backend
 library;
 
+import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:nubbill/config/supabase_config.dart';
 
 /// API configuration constants
 class ApiConfig {
-  /// Base URL for the backend API
-  /// Use 'http://10.0.2.2:3000' for Android emulator
-  /// Use 'http://localhost:3000' for iOS simulator/web
-  /// Use your computer's IP for real devices
-  static const String baseUrl = 'http://10.0.2.2:3000';
+  /// Base URL for the backend API.
+  ///
+  /// You can override at build/run time:
+  /// `--dart-define=API_BASE_URL=http://<host>:3000`
+  static String get baseUrl {
+    const override = String.fromEnvironment('API_BASE_URL');
+    if (override.isNotEmpty) return override;
+
+    if (kIsWeb) return 'http://localhost:3000';
+    if (Platform.isAndroid) return 'http://10.0.2.2:3000'; // Android emulator
+    return 'http://localhost:3000'; // iOS simulator / desktop
+  }
 
   /// API prefix
   static const String apiPrefix = '/api';
@@ -23,6 +33,7 @@ class ApiConfig {
 /// HTTP client wrapper that injects Supabase JWT token
 class ApiClient {
   final http.Client _client = http.Client();
+  static const Duration _timeout = Duration(seconds: 15);
 
   /// Get current JWT token from Supabase session
   String? get _accessToken =>
@@ -46,7 +57,7 @@ class ApiClient {
       final response = await _client.get(
         Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
         headers: _headers,
-      );
+      ).timeout(_timeout);
       return ApiResponse.fromHttpResponse(response);
     } catch (e) {
       return ApiResponse.error(e.toString());
@@ -63,7 +74,7 @@ class ApiClient {
         Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
         headers: _headers,
         body: body != null ? jsonEncode(body) : null,
-      );
+      ).timeout(_timeout);
       return ApiResponse.fromHttpResponse(response);
     } catch (e) {
       return ApiResponse.error(e.toString());
@@ -80,7 +91,7 @@ class ApiClient {
         Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
         headers: _headers,
         body: body != null ? jsonEncode(body) : null,
-      );
+      ).timeout(_timeout);
       return ApiResponse.fromHttpResponse(response);
     } catch (e) {
       return ApiResponse.error(e.toString());
@@ -93,7 +104,7 @@ class ApiClient {
       final response = await _client.delete(
         Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
         headers: _headers,
-      );
+      ).timeout(_timeout);
       return ApiResponse.fromHttpResponse(response);
     } catch (e) {
       return ApiResponse.error(e.toString());
@@ -107,7 +118,7 @@ class ApiClient {
         Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
         headers: _headers,
         body: body != null ? jsonEncode(body) : null,
-      );
+      ).timeout(_timeout);
       return ApiResponse.fromHttpResponse(response);
     } catch (e) {
       return ApiResponse.error(e.toString());

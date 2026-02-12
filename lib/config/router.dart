@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nubbill/services/auth_repository.dart';
-import 'package:nubbill/screens/login_screen.dart';
+import 'package:nubbill/screens/login_page.dart';
 import 'package:nubbill/screens/otp_screen.dart';
 import 'package:nubbill/screens/onboarding_screen.dart';
 import 'package:nubbill/screens/nickname_screen.dart';
@@ -20,6 +20,10 @@ import 'package:nubbill/screens/profile_screen.dart';
 import 'package:nubbill/screens/authentication_page.dart';
 import 'package:nubbill/screens/register_page.dart';
 import 'package:nubbill/screens/notifications_screen.dart';
+import 'package:nubbill/screens/forgot_password_page.dart';
+import 'package:nubbill/screens/reset_password_page.dart';
+import 'package:nubbill/screens/add_expense_screen.dart';
+import 'package:nubbill/models/trip_member_model.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -38,7 +42,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           state.uri.path == '/login' ||
           state.uri.path == '/register' ||
           state.uri.path == '/welcome' ||
-          state.uri.path == '/otp';
+          state.uri.path == '/otp' ||
+          state.uri.path == '/forgot-password' ||
+          state.uri.path == '/reset-password';
       final isSplash = state.uri.path == '/';
       final isNickname = state.uri.path == '/nickname';
 
@@ -69,7 +75,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         // 4. If not -> Onboarding
 
         // So I should redirect to /onboarding if not logged in.
-        return '/onboarding';
+        return '/welcome';
       }
 
       if (isLoggedIn) {
@@ -100,7 +106,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/welcome',
         builder: (context, state) => const AuthenticationPage(),
       ),
-      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
+      GoRoute(path: '/login', builder: (context, state) => const LoginPage()),
       GoRoute(
         path: '/otp',
         builder: (context, state) {
@@ -113,16 +119,20 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const NicknameScreen(),
       ),
       GoRoute(
-        path: '/bill_details',
+        path: '/expenses/:id',
         builder: (context, state) {
-          // Pass dummy data if not provided (for now)
-          // ideally state.extra would be Bill object or ID
-          return BillDetailsPage(
-            billId: '1',
-            billTitle: 'มื้อเที่ยง',
-            totalAmount: 850,
-            categoryIcon: Icons.restaurant,
-            date: DateTime.now(),
+          final expenseId = state.pathParameters['id'] ?? '';
+          return BillDetailsPage(expenseId: expenseId);
+        },
+      ),
+      GoRoute(
+        path: '/add_expense',
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return AddExpenseScreen(
+            tripId: extra['tripId'] as String? ?? '',
+            tripName: extra['tripName'] as String? ?? '',
+            members: extra['members'] as List<TripMember>?,
           );
         },
       ),
@@ -137,6 +147,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/register',
         builder: (context, state) => const RegisterPage(),
+      ),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (context, state) => const ForgotPasswordPage(),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        builder: (context, state) => const ResetPasswordPage(),
       ),
 
       // Bottom Nav Shell - 4 tabs matching design

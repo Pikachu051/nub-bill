@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:nubbill/screens/register_page.dart';
-import 'package:nubbill/screens/login_page.dart';
+import 'package:go_router/go_router.dart';
 import '../widgets/rounded_button.dart';
 
 class AuthenticationPage extends StatelessWidget {
@@ -17,13 +16,8 @@ class AuthenticationPage extends StatelessWidget {
               text: 'สมัครบัญชีใหม่',
               backgroundColor: const Color.fromARGB(255, 129, 206, 242),
               textColor: Colors.white,
-              
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => RegisterPage()),
-                );
-              },
+
+              onPressed: () => context.push('/register'),
             ),
             const SizedBox(height: 16),
             RoundedButton(
@@ -31,12 +25,7 @@ class AuthenticationPage extends StatelessWidget {
               backgroundColor: Colors.white,
               textColor: const Color.fromARGB(255, 129, 206, 242),
               outlined: true,
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => LoginPage()),
-                );
-              },
+              onPressed: () => context.push('/login'),
             ),
           ],
         ),

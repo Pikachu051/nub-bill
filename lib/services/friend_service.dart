@@ -203,14 +203,17 @@ class FriendService {
     return PendingRequests(incoming: incoming, outgoing: outgoing);
   }
 
-  /// Search users by email or nickname
+  /// Search users by email (exact match)
   Future<List<UserSearchResult>> searchUsers(String query) async {
+    final email = query.toLowerCase().trim();
+    if (email.isEmpty) return [];
+
     final results = await _supabase
         .from('profiles')
         .select('id, nickname, email, avatar_url')
-        .or('nickname.ilike.%$query%,email.ilike.%$query%')
+        .eq('email', email)
         .neq('id', _userId)
-        .limit(20);
+        .limit(10);
 
     final List<UserSearchResult> searchResults = [];
 

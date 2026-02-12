@@ -11,67 +11,88 @@ final userTripsProvider = FutureProvider<List<Trip>>((ref) async {
   final userId = SupabaseConfig.currentUser?.id;
   if (userId == null) return [];
 
-  // Get trips where user is a member
-  final response = await SupabaseConfig.client
-      .from('trip_members')
-      .select('trip:trips(*)')
-      .eq('user_id', userId);
+  try {
+    // Get trips where user is a member
+    final response = await SupabaseConfig.client
+        .from('trip_members')
+        .select('trip:trips(*)')
+        .eq('user_id', userId);
 
-  final trips = <Trip>[];
-  for (final item in response as List) {
-    if (item['trip'] != null) {
-      trips.add(Trip.fromJson(item['trip'] as Map<String, dynamic>));
+    final trips = <Trip>[];
+    for (final item in response as List) {
+      if (item['trip'] != null) {
+        trips.add(Trip.fromJson(item['trip'] as Map<String, dynamic>));
+      }
     }
+    return trips;
+  } catch (e) {
+    debugPrint('Failed to load trips: $e');
+    rethrow; // Let AsyncValue.error handle it gracefully
   }
-  return trips;
 });
 
 /// Provider for wallet summary (total owed to user & user owes)
 final walletSummaryProvider = FutureProvider<Map<String, double>>((ref) async {
-  final userId = SupabaseConfig.currentUser?.id;
-  if (userId == null) return {'toReceive': 0, 'toPay': 0};
+  try {
+    final userId = SupabaseConfig.currentUser?.id;
+    if (userId == null) return {'toReceive': 0.0, 'toPay': 0.0};
 
-  // Get member IDs for this user
-  final memberResponse = await SupabaseConfig.client
-      .from('trip_members')
-      .select('id')
-      .eq('user_id', userId);
+    // Get member IDs for this user
+    final memberResponse = await SupabaseConfig.client
+        .from('trip_members')
+        .select('id')
+        .eq('user_id', userId);
 
-  final memberIds = (memberResponse as List)
-      .map((m) => m['id'] as String)
-      .toList();
+    final memberIds = (memberResponse as List)
+        .map((m) => m['id'] as String)
+        .toList();
 
-  if (memberIds.isEmpty) return {'toReceive': 0, 'toPay': 0};
+    if (memberIds.isEmpty) return {'toReceive': 0.0, 'toPay': 0.0};
 
-  // Get expense splits where user owes money (unpaid)
-  final owesResponse = await SupabaseConfig.client
-      .from('expense_splits')
-      .select('amount')
-      .inFilter('member_id', memberIds)
-      .eq('status', 'pending');
+    double toPay = 0.0;
+    double toReceive = 0.0;
 
-  double toPay = 0;
-  for (final split in owesResponse as List) {
-    toPay += (split['amount'] as num).toDouble();
-  }
+    // Get expense splits where user owes money (unpaid)
+    try {
+      final owesResponse = await SupabaseConfig.client
+          .from('expense_splits')
+          .select('amount')
+          .inFilter('member_id', memberIds)
+          .eq('status', 'unpaid');
 
-  // Get expenses created by user's members where others owe money
-  final toReceiveResponse = await SupabaseConfig.client
-      .from('expenses')
-      .select('expense_splits(amount, status)')
-      .inFilter('paid_by_member_id', memberIds);
-
-  double toReceive = 0;
-  for (final expense in toReceiveResponse as List) {
-    final splits = expense['expense_splits'] as List? ?? [];
-    for (final split in splits) {
-      if (split['status'] == 'pending') {
-        toReceive += (split['amount'] as num).toDouble();
+      for (final split in owesResponse as List) {
+        toPay += (split['amount'] as num).toDouble();
       }
+    } catch (e) {
+      // Expense splits query failed, continue with 0
+      debugPrint('Wallet - expense_splits query failed: $e');
     }
-  }
 
-  return {'toReceive': toReceive, 'toPay': toPay};
+    // Get expenses created by user's members where others owe money
+    try {
+      final toReceiveResponse = await SupabaseConfig.client
+          .from('expenses')
+          .select('expense_splits(amount, status)')
+          .inFilter('payer_id', memberIds);
+
+      for (final expense in toReceiveResponse as List) {
+        final splits = expense['expense_splits'] as List? ?? [];
+        for (final split in splits) {
+          if (split['status'] == 'unpaid') {
+            toReceive += (split['amount'] as num).toDouble();
+          }
+        }
+      }
+    } catch (e) {
+      // Expenses query failed, continue with 0
+      debugPrint('Wallet - expenses query failed: $e');
+    }
+
+    return {'toReceive': toReceive, 'toPay': toPay};
+  } catch (e) {
+    debugPrint('Wallet provider error: $e');
+    return {'toReceive': 0.0, 'toPay': 0.0};
+  }
 });
 
 class HomePage extends ConsumerWidget {
@@ -100,10 +121,19 @@ class HomePage extends ConsumerWidget {
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      body: RefreshIndicator(
+        onRefresh: () async {
+          // Refresh trips and wallet summary from Supabase with pull-to-refresh
+          await Future.wait([
+            ref.refresh(userTripsProvider.future),
+            ref.refresh(walletSummaryProvider.future),
+          ]);
+        },
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             // Header with overlapping wallet card
             Stack(
               clipBehavior: Clip.none,
@@ -219,8 +249,10 @@ class HomePage extends ConsumerWidget {
           ],
         ),
       ),
+      ),
       // FAB for creating new group
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'createGroupFab',
         onPressed: () => context.push('/groups/create'),
         backgroundColor: const Color(0xFF81CEF2),
         icon: const Icon(Icons.add, color: Colors.white),
@@ -390,15 +422,27 @@ class HomePage extends ConsumerWidget {
         ),
       ),
       error: (err, _) => Center(
-        child: Column(
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.grey),
-            const SizedBox(height: 8),
-            Text(
-              'ไม่สามารถโหลดกลุ่มได้',
-              style: TextStyle(color: Colors.grey[600]),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(40),
+          child: Column(
+            children: [
+              const Icon(Icons.wifi_off, size: 48, color: Colors.grey),
+              const SizedBox(height: 12),
+              Text(
+                'ไม่สามารถเชื่อมต่อได้',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่',
+                style: TextStyle(color: Colors.grey[500], fontSize: 14),
+              ),
+            ],
+          ),
         ),
       ),
       data: (trips) {
@@ -435,19 +479,11 @@ class HomePage extends ConsumerWidget {
   }
 
   Widget _buildGroupCard(BuildContext context, Trip trip) {
-    return Container(
+    return Card(
+      elevation: 0,
+      color: Colors.white,
       margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.03),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
@@ -460,13 +496,10 @@ class HomePage extends ConsumerWidget {
               ? Icon(trip.category.icon, color: const Color(0xFF81CEF2))
               : null,
         ),
-        title: Text(
-          trip.name,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-        ),
+        title: Text(trip.name, style: const TextStyle(fontSize: 16)),
         subtitle: Text(
           _formatDateRange(trip.startDate, trip.endDate),
-          style: TextStyle(color: Colors.grey[500], fontSize: 13),
+          style: const TextStyle(color: Color(0x80141416), fontSize: 13),
         ),
         trailing: Column(
           mainAxisAlignment: MainAxisAlignment.center,

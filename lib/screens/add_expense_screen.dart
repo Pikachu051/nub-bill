@@ -172,224 +172,215 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      padding: EdgeInsets.only(
-        top: 16,
-        left: 16,
-        right: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Header
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              TextButton(
-                onPressed: _isLoading ? null : () => Navigator.pop(context),
-                child: const Text(
-                  'ยกเลิก',
-                  style: TextStyle(color: Colors.grey),
-                ),
+    return Scaffold(
+      backgroundColor: Colors.grey[50],
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.black),
+          onPressed: _isLoading ? null : () => Navigator.pop(context),
+        ),
+        title: const Text(
+          'เพิ่มบิล',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
+        actions: [
+          TextButton(
+            onPressed: _isLoading ? null : _saveExpense,
+            child: const Text(
+              'บันทึก',
+              style: TextStyle(
+                color: Color(0xFF81CEF2),
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
-              Text(
-                widget.tripName != null
-                    ? 'เพิ่มบิล - ${widget.tripName}'
-                    : 'เพิ่มบิล',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              TextButton(
-                onPressed: _isLoading ? null : _saveExpense,
-                child: _isLoading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text(
-                        'บันทึก',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-              ),
-            ],
-          ),
-          const Divider(),
-          Expanded(
-            child: ListView(
-              children: [
-                // Description
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: TextField(
-                    controller: _descriptionController,
-                    decoration: const InputDecoration(
-                      labelText: 'รายละเอียด *',
-                      hintText: 'เช่น ค่าอาหารเที่ยง',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.description),
-                    ),
-                  ),
-                ),
-
-                // Amount
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: TextField(
-                    controller: _amountController,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    decoration: const InputDecoration(
-                      labelText: 'ยอดเงิน *',
-                      prefixText: '฿ ',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.attach_money),
-                    ),
-                    style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue,
-                    ),
-                  ),
-                ),
-
-                // Date & Payer
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: _pickDate,
-                        icon: const Icon(Icons.calendar_today, size: 16),
-                        label: Text(
-                          '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: PopupMenuButton<String>(
-                        onSelected: (value) {
-                          setState(() => _payerMemberId = value);
-                        },
-                        itemBuilder: (context) {
-                          return _memberState.map((m) {
-                            return PopupMenuItem<String>(
-                              value: m['id'],
-                              child: Text(m['name']),
-                            );
-                          }).toList();
-                        },
-                        child: OutlinedButton.icon(
-                          onPressed: null,
-                          icon: const Icon(Icons.person, size: 16),
-                          label: Text(
-                            _payerMemberId != null
-                                ? _memberState.firstWhere(
-                                    (m) => m['id'] == _payerMemberId,
-                                    orElse: () => {'name': 'เลือกคนจ่าย'},
-                                  )['name']
-                                : 'คนจ่าย',
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 24),
-
-                // Split Type Tabs
-                const Text(
-                  'แบ่งจ่าย',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(value: 'equal', label: Text('หารเท่า')),
-                    ButtonSegment(value: 'exact', label: Text('ระบุเอง')),
-                    ButtonSegment(value: 'percent', label: Text('%')),
-                  ],
-                  selected: {_selectedSplitType},
-                  onSelectionChanged: (newSelection) {
-                    setState(() {
-                      _selectedSplitType = newSelection.first;
-                    });
-                  },
-                  style: const ButtonStyle(
-                    visualDensity: VisualDensity.compact,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-
-                // Members List
-                const SizedBox(height: 16),
-                if (_memberState.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Text(
-                      'ไม่พบสมาชิกในกลุ่ม',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                  )
-                else
-                  ..._memberState.map((member) {
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(
-                        backgroundColor: const Color(
-                          0xFF81CEF2,
-                        ).withValues(alpha: 0.2),
-                        backgroundImage: member['avatarUrl'] != null
-                            ? NetworkImage(member['avatarUrl'])
-                            : null,
-                        child: member['avatarUrl'] == null
-                            ? Text(member['avatar'])
-                            : null,
-                      ),
-                      title: Text(member['name']),
-                      trailing: _buildSplitInput(member),
-                    );
-                  }),
-
-                // Summary
-                if (_selectedSplitType == 'equal' && _memberState.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Builder(
-                      builder: (context) {
-                        final selectedCount = _memberState
-                            .where((m) => m['selected'] == true)
-                            .length;
-                        final amount =
-                            double.tryParse(_amountController.text) ?? 0;
-                        final perPerson = selectedCount > 0
-                            ? amount / selectedCount
-                            : 0;
-                        return Text(
-                          'คนละ: ฿${perPerson.toStringAsFixed(2)} ($selectedCount คน)',
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(
-                            color: Colors.green,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-              ],
             ),
           ),
         ],
+      ),
+      body: Container(
+        decoration: const BoxDecoration(color: Colors.white),
+        padding: EdgeInsets.only(
+          top: 16,
+          left: 16,
+          right: 16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Divider(),
+            Expanded(
+              child: ListView(
+                children: [
+                  // Description
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: TextField(
+                      controller: _descriptionController,
+                      decoration: const InputDecoration(
+                        labelText: 'รายละเอียด *',
+                        hintText: 'เช่น ค่าอาหารเที่ยง',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.description),
+                      ),
+                    ),
+                  ),
+
+                  // Amount
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: TextField(
+                      controller: _amountController,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: const InputDecoration(
+                        labelText: 'ยอดเงิน *',
+                        prefixText: '฿ ',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.attach_money),
+                      ),
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
+
+                  // Date & Payer
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _pickDate,
+                          icon: const Icon(Icons.calendar_today, size: 16),
+                          label: Text(
+                            '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: PopupMenuButton<String>(
+                          onSelected: (value) {
+                            setState(() => _payerMemberId = value);
+                          },
+                          itemBuilder: (context) {
+                            return _memberState.map((m) {
+                              return PopupMenuItem<String>(
+                                value: m['id'],
+                                child: Text(m['name']),
+                              );
+                            }).toList();
+                          },
+                          child: OutlinedButton.icon(
+                            onPressed: null,
+                            icon: const Icon(Icons.person, size: 16),
+                            label: Text(
+                              _payerMemberId != null
+                                  ? _memberState.firstWhere(
+                                      (m) => m['id'] == _payerMemberId,
+                                      orElse: () => {'name': 'เลือกคนจ่าย'},
+                                    )['name']
+                                  : 'คนจ่าย',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Split Type Tabs
+                  const Text(
+                    'แบ่งจ่าย',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 8),
+                  SegmentedButton<String>(
+                    segments: const [
+                      ButtonSegment(value: 'equal', label: Text('หารเท่า')),
+                      ButtonSegment(value: 'exact', label: Text('ระบุเอง')),
+                      ButtonSegment(value: 'percent', label: Text('%')),
+                    ],
+                    selected: {_selectedSplitType},
+                    onSelectionChanged: (newSelection) {
+                      setState(() {
+                        _selectedSplitType = newSelection.first;
+                      });
+                    },
+                    style: const ButtonStyle(
+                      visualDensity: VisualDensity.compact,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+
+                  // Members List
+                  const SizedBox(height: 16),
+                  if (_memberState.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text(
+                        'ไม่พบสมาชิกในกลุ่ม',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey),
+                      ),
+                    )
+                  else
+                    ..._memberState.map((member) {
+                      return ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: CircleAvatar(
+                          backgroundColor: const Color(
+                            0xFF81CEF2,
+                          ).withValues(alpha: 0.2),
+                          backgroundImage: member['avatarUrl'] != null
+                              ? NetworkImage(member['avatarUrl'])
+                              : null,
+                          child: member['avatarUrl'] == null
+                              ? Text(member['avatar'])
+                              : null,
+                        ),
+                        title: Text(member['name']),
+                        trailing: _buildSplitInput(member),
+                      );
+                    }),
+
+                  // Summary
+                  if (_selectedSplitType == 'equal' && _memberState.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Builder(
+                        builder: (context) {
+                          final selectedCount = _memberState
+                              .where((m) => m['selected'] == true)
+                              .length;
+                          final amount =
+                              double.tryParse(_amountController.text) ?? 0;
+                          final perPerson = selectedCount > 0
+                              ? amount / selectedCount
+                              : 0;
+                          return Text(
+                            'คนละ: ฿${perPerson.toStringAsFixed(2)} ($selectedCount คน)',
+                            textAlign: TextAlign.right,
+                            style: const TextStyle(
+                              color: Colors.green,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
