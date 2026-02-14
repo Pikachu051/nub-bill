@@ -134,136 +134,149 @@ class HomePage extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            // Header with overlapping wallet card
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // Blue background with rounded bottom
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    bottomLeft: Radius.circular(32),
-                    bottomRight: Radius.circular(32),
+              // Header with overlapping wallet card
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  // 👇 เอา ClipPath ไว้เป็น background อย่างเดียว
+                  ClipPath(
+                    clipper: CustomClipPath(),
+                    child: Container(
+                      width: double.infinity,
+                      height: 200,
+                      color: const Color(0xFF81CEF2),
+                    ),
                   ),
-                  child: Container(
-                    width: double.infinity,
-                    height: 180,
-                    color: const Color(0xFF81CEF2),
-                    child: SafeArea(
-                      bottom: false,
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Avatar with white border
-                            Container(
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                border: Border.all(
+
+                  // 👇 เอา content ออกมาวางทับ
+                  SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: CircleAvatar(
+                              radius: 30,
+                              backgroundColor: Colors.white24,
+                              backgroundImage: avatarUrl != null
+                                  ? NetworkImage(avatarUrl)
+                                  : null,
+                              child: avatarUrl == null
+                                  ? const Icon(
+                                      Icons.person,
+                                      size: 30,
+                                      color: Colors.white,
+                                    )
+                                  : null,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'คุณ, $nickname',
+                                style: const TextStyle(
                                   color: Colors.white,
-                                  width: 2,
+                                  fontSize: 16,
                                 ),
                               ),
-                              child: CircleAvatar(
-                                radius: 30,
-                                backgroundColor: Colors.white24,
-                                backgroundImage: avatarUrl != null
-                                    ? NetworkImage(avatarUrl)
-                                    : null,
-                                child: avatarUrl == null
-                                    ? const Icon(
-                                        Icons.person,
-                                        size: 30,
-                                        color: Colors.white,
-                                      )
-                                    : null,
+                              const SizedBox(height: 4),
+                              const Text(
+                                'เคลียร์บิลกันเถอะ!',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 24,
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 16),
-                            // Text
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  'คุณ, $nickname',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'เคลียร์บิลกันเถอะ!',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 24,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
+                            ],
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-                // Wallet card overlapping header - positioned at the bottom
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  top:
-                      130, // Position card so it starts inside the blue area at the bottom
-                  child: _buildWalletCard(walletAsync),
-                ),
-              ],
-            ),
 
-            // Spacing for the overlapping card (wallet card is ~160px tall, positioned at 130, blue header is 180)
-            // Card extends from 130 to ~290, so we need 290 - 180 = 110 spacing
-            const SizedBox(height: 130),
-
-            // Groups section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Top padding for groups section
-                  const SizedBox(height: 20),
-
-                  // Groups Header
-                  _buildGroupsHeader(tripsAsync),
-
-                  const SizedBox(height: 12),
-
-                  // Groups List
-                  _buildGroupsList(context, tripsAsync),
-
-                  // Bottom padding for FAB
-                  const SizedBox(height: 80),
+                  // Wallet card
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    top: 130,
+                    child: _buildWalletCard(walletAsync),
+                  ),
                 ],
               ),
-            ),
-          ],
+
+              // Spacing for the overlapping card (wallet card is ~160px tall, positioned at 130, blue header is 180)
+              // Card extends from 130 to ~290, so we need 290 - 180 = 110 spacing
+              const SizedBox(height: 130),
+
+              // Groups section
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Top padding for groups section
+                    const SizedBox(height: 20),
+
+                    // Groups Header
+                    _buildGroupsHeader(tripsAsync),
+
+                    const SizedBox(height: 12),
+
+                    // Groups List
+                    _buildGroupsList(context, tripsAsync),
+
+                    // Bottom padding for FAB
+                    const SizedBox(height: 80),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
       ),
       // FAB for creating new group
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'createGroupFab',
         onPressed: () => context.push('/groups/create'),
         backgroundColor: const Color(0xFF81CEF2),
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text(
-          'สร้างกลุ่มใหม่',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+        icon: const Icon(Icons.people, color: Colors.white),
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: const [
+            Text(
+              'สร้างกลุ่มใหม่',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(width: 8),
+            Text(
+              '|',
+              style: TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            SizedBox(width: 8),
+            Icon(Icons.keyboard_arrow_up, color: Colors.white, size: 24),
+          ],
         ),
       ),
     );
   }
 
+//Wallet widget
   Widget _buildWalletCard(AsyncValue<Map<String, double>> walletAsync) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -544,5 +557,29 @@ class HomePage extends ConsumerWidget {
           RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]},',
         );
+  }
+}
+
+class CustomClipPath extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    double w = size.width;
+    double h = size.height;
+
+    final path = Path();
+
+    path.lineTo(0, h - 50);
+
+    path.quadraticBezierTo(w * 0.5, h + 150, w, h - 50);
+
+    path.lineTo(w, 0);
+    path.close();
+
+    return path;
+  }
+
+  @override
+  bool shouldReclip(CustomClipper<Path> oldClipper) {
+    return false;
   }
 }
