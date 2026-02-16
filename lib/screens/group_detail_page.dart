@@ -31,6 +31,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
 
   /// Current user's member ID in this trip
   String? _myMemberId;
+  final Map<String, String> _memberNameById = {};
 
   @override
   void initState() {
@@ -50,8 +51,15 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       tripDetailProvider(widget.groupId).future,
     );
     if (mounted && tripDetail != null) {
+      final memberNames = <String, String>{};
+      for (final member in tripDetail.members) {
+        memberNames[member.id] = member.displayName;
+      }
       setState(() {
         _myMemberId = tripDetail.myMemberId;
+        _memberNameById
+          ..clear()
+          ..addAll(memberNames);
       });
     }
 
@@ -637,40 +645,99 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     }
 
     // Find user's split in this expense
-    final mySplit = expense.splits.where((s) => s.memberId == myId);
-
-    // User is the payer
+    final mySplits = expense.splits.where((s) => s.memberId == myId).toList();
+    final mySplit = mySplits.isNotEmpty ? mySplits.first : null;
     final isPayer = expense.payerId == myId;
 
-    if (mySplit.isEmpty && !isPayer) {
+    if (isPayer) {
+      // As payer, show "รอรับเงิน" while someone else is still unpaid.
+      final hasUnpaidFromOthers = expense.splits.any(
+        (s) => s.memberId != myId && s.status != 'paid',
+      );
+      if (hasUnpaidFromOthers) {
+        return _BillStatus.othersOweYou;
+      }
+      return _BillStatus.cleared;
+    }
+
+    // Not payer
+    if (mySplit == null) {
       return _BillStatus.notInvolved;
     }
 
-    // If user has a split, check its status
-    if (mySplit.isNotEmpty) {
-      final split = mySplit.first;
-      if (split.status == 'paid') {
-        return _BillStatus.cleared;
-      }
-      // User owes money (not the payer and has unpaid split)
-      if (!isPayer) {
-        return _BillStatus.youOwe;
-      }
-    }
-
-    // User is payer — check if others have unpaid splits
-    final unpaidSplits = expense.splits.where(
-      (s) => s.memberId != myId && s.status != 'paid',
-    );
-    if (unpaidSplits.isNotEmpty) {
-      return _BillStatus.othersOweYou;
+    if (mySplit.status != 'paid') {
+      return _BillStatus.youOwe;
     }
 
     return _BillStatus.cleared;
   }
 
+  double _sumAmounts(Iterable<ExpenseSplitSummary> splits) {
+    return splits.fold(0.0, (sum, split) => sum + split.amount);
+  }
+
+  double _amountForStatus(Expense expense, _BillStatus status) {
+    final myId = _myMemberId;
+    if (myId == null) {
+      return expense.amount;
+    }
+
+    final mySplit = expense.splits.where((s) => s.memberId == myId).toList();
+    final myShare = mySplit.isNotEmpty ? mySplit.first.amount : 0.0;
+    final otherSplits = expense.splits.where((s) => s.memberId != myId).toList();
+    final unpaidOtherSplits = otherSplits.where((s) => s.status != 'paid');
+    final isPayer = expense.payerId == myId;
+
+    switch (status) {
+      case _BillStatus.youOwe:
+        return myShare;
+      case _BillStatus.othersOweYou:
+        return _sumAmounts(unpaidOtherSplits);
+      case _BillStatus.cleared:
+        if (isPayer) {
+          // In single-member/self-paid bills, there is no counterparty amount.
+          if (otherSplits.isEmpty) return expense.amount;
+          return _sumAmounts(otherSplits);
+        }
+        return myShare > 0 ? myShare : expense.amount;
+      case _BillStatus.notInvolved:
+        return expense.amount;
+    }
+  }
+
+  String _clearedMessage(Expense expense) {
+    final myId = _myMemberId;
+    if (myId == null) return 'คุณเคลียร์เรียบร้อยแล้ว';
+
+    final isPayer = expense.payerId == myId;
+    final otherSplits = expense.splits.where((s) => s.memberId != myId).toList();
+
+    if (!isPayer) {
+      final payeeName = expense.payer?.displayName;
+      if (payeeName != null && payeeName != 'Unknown') {
+        return 'คุณจ่ายคืน $payeeName แล้ว';
+      }
+      return 'คุณเคลียร์เรียบร้อยแล้ว';
+    }
+
+    if (otherSplits.isEmpty) {
+      return 'คุณเคลียร์เรียบร้อยแล้ว';
+    }
+
+    if (otherSplits.length == 1) {
+      final otherName = _memberNameById[otherSplits.first.memberId];
+      if (otherName != null && otherName.isNotEmpty) {
+        return '$otherNameจ่ายคืน คุณ แล้ว';
+      }
+      return 'มีคนจ่ายคืน คุณ แล้ว';
+    }
+
+    return 'ทุกคนจ่ายคืน คุณ แล้ว';
+  }
+
   Widget _buildExpenseCard(Expense expense) {
     final status = _getBillStatus(expense);
+    final displayAmount = _amountForStatus(expense, status);
 
     // Find user's specific owe amount
     double? userOweAmount;
@@ -743,8 +810,9 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
               _buildStatusLabel(
                 status,
                 userOweAmount,
-                expense.amount,
+                displayAmount,
                 expense.payer?.displayName,
+                _clearedMessage(expense),
               ),
             ],
           ),
@@ -756,8 +824,9 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
   Widget _buildStatusLabel(
     _BillStatus status,
     double? userOweAmount,
-    double totalAmount,
+    double displayAmount,
     String? payerName,
+    String clearedMessage,
   ) {
     switch (status) {
       case _BillStatus.youOwe:
@@ -796,7 +865,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
               ),
             ),
             Text(
-              '${totalAmount.toStringAsFixed(2)}฿',
+              '${displayAmount.toStringAsFixed(2)}฿',
               style: TextStyle(
                 fontSize: 15,
                 color: Colors.green[600],
@@ -810,7 +879,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              '${totalAmount.toStringAsFixed(2)}฿',
+              '${displayAmount.toStringAsFixed(2)}฿',
               style: const TextStyle(
                 fontSize: 14,
                 color: Colors.black87,
@@ -818,7 +887,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
               ),
             ),
             Text(
-              '${payerName ?? "เพื่อน"}จ่ายคืน คุณ แล้ว',
+              clearedMessage,
               style: TextStyle(fontSize: 11, color: Colors.grey[500]),
             ),
           ],
