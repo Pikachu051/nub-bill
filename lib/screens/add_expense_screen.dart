@@ -75,7 +75,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       return;
     }
 
-    if (widget.tripId == null) {
+    if (widget.tripId == null || widget.tripId!.isEmpty) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('กรุณาเลือกกลุ่ม')));
@@ -100,6 +100,50 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         return;
       }
 
+      if (_payerMemberId == null || _payerMemberId!.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('กรุณาเลือกคนจ่าย')),
+        );
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      if (_selectedSplitType == 'exact') {
+        final exactSum = selectedMembers.fold<double>(0, (sum, member) {
+          final value = (member['amount'] as num?)?.toDouble() ?? 0;
+          return sum + value;
+        });
+        if ((exactSum - amount).abs() > 0.01) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'ยอดรวมที่แบ่ง (${exactSum.toStringAsFixed(2)}) ต้องเท่ากับยอดบิล (${amount.toStringAsFixed(2)})',
+              ),
+            ),
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
+
+      if (_selectedSplitType == 'percent') {
+        final percentSum = selectedMembers.fold<double>(0, (sum, member) {
+          final value = (member['percent'] as num?)?.toDouble() ?? 0;
+          return sum + value;
+        });
+        if ((percentSum - 100).abs() > 0.05) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'เปอร์เซ็นต์รวมต้องเป็น 100% (ปัจจุบัน ${percentSum.toStringAsFixed(2)}%)',
+              ),
+            ),
+          );
+          setState(() => _isLoading = false);
+          return;
+        }
+      }
+
       // Prepare API call based on split type
       if (_selectedSplitType == 'equal') {
         await expenseService.createExpense(
@@ -116,11 +160,14 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       } else {
         // Exact or percent - build splits array
         final splits = selectedMembers.map((m) {
+          final exactAmount = (m['amount'] as num?)?.toDouble() ?? 0;
+          final percent = (m['percent'] as num?)?.toDouble() ?? 0;
           return {
             'member_id': m['id'],
             'amount': _selectedSplitType == 'exact'
-                ? m['amount'] as double
-                : (amount * (m['percent'] as double) / 100),
+                ? exactAmount
+                : percent, // keep legacy compatibility for percent-mode payloads
+            if (_selectedSplitType == 'percent') 'percent': percent,
           };
         }).toList();
 
@@ -138,12 +185,13 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       // Refresh expenses list
       ref.invalidate(tripExpensesProvider(widget.tripId!));
       ref.invalidate(tripBalancesProvider(widget.tripId!));
+      ref.invalidate(tripDebtsProvider(widget.tripId!));
 
       if (mounted) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('เพิ่มบิลสำเร็จ!')));
-        Navigator.pop(context);
+        Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
