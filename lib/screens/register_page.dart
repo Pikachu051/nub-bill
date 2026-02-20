@@ -95,11 +95,12 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.only(top: 60),
+      body: SingleChildScrollView(
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+          padding: const EdgeInsets.only(top: 60),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
@@ -306,6 +307,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
             ],
           ),
+        ),
         ),
       ),
     );
