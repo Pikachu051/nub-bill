@@ -4,6 +4,7 @@ import 'package:nubbill/models/trip_model.dart';
 import 'package:nubbill/models/trip_member_model.dart';
 import 'package:nubbill/models/balance_entry_model.dart';
 import 'package:nubbill/models/debt_entry_model.dart';
+import 'package:nubbill/services/auth_repository.dart';
 
 /// Provider for TripService
 final tripServiceProvider = Provider<TripService>((ref) {
@@ -11,37 +12,43 @@ final tripServiceProvider = Provider<TripService>((ref) {
 });
 
 /// Provider for trips list (auto-refresh)
-final tripsProvider = FutureProvider<List<Trip>>((ref) async {
+final tripsProvider = FutureProvider.autoDispose<List<Trip>>((ref) async {
+  final userId = ref.watch(authUserIdProvider);
+  if (userId == null) return [];
+
   final service = ref.read(tripServiceProvider);
   return service.getTrips();
 });
 
 /// Provider for a specific trip detail
-final tripDetailProvider = FutureProvider.family<TripDetailResponse?, String>((
-  ref,
-  tripId,
-) async {
-  final service = ref.read(tripServiceProvider);
-  return service.getTripDetail(tripId);
-});
+final tripDetailProvider = FutureProvider.autoDispose
+    .family<TripDetailResponse?, String>((ref, tripId) async {
+      final userId = ref.watch(authUserIdProvider);
+      if (userId == null) return null;
+
+      final service = ref.read(tripServiceProvider);
+      return service.getTripDetail(tripId);
+    });
 
 /// Provider for trip balances (who owes who)
-final tripBalancesProvider = FutureProvider.family<List<BalanceEntry>, String>((
-  ref,
-  tripId,
-) async {
-  final service = ref.read(tripServiceProvider);
-  return service.getTripBalances(tripId);
-});
+final tripBalancesProvider = FutureProvider.autoDispose
+    .family<List<BalanceEntry>, String>((ref, tripId) async {
+      final userId = ref.watch(authUserIdProvider);
+      if (userId == null) return [];
+
+      final service = ref.read(tripServiceProvider);
+      return service.getTripBalances(tripId);
+    });
 
 /// Provider for simplified pairwise debts
-final tripDebtsProvider = FutureProvider.family<List<DebtEntry>, String>((
-  ref,
-  tripId,
-) async {
-  final service = ref.read(tripServiceProvider);
-  return service.getTripDebts(tripId);
-});
+final tripDebtsProvider = FutureProvider.autoDispose
+    .family<List<DebtEntry>, String>((ref, tripId) async {
+      final userId = ref.watch(authUserIdProvider);
+      if (userId == null) return [];
+
+      final service = ref.read(tripServiceProvider);
+      return service.getTripDebts(tripId);
+    });
 
 /// Trip detail response containing trip, members, and role
 class TripDetailResponse {

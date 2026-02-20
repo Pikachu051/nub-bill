@@ -1,11 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nubbill/services/auth_repository.dart';
 
-final authStateProvider = StreamProvider<AuthState>((ref) {
-  final repository = ref.watch(authRepositoryProvider);
-  return repository.authStateChanges;
-});
+final authStateProvider = authStateChangesProvider;
 
 final authControllerProvider =
     StateNotifierProvider<AuthController, AsyncValue<void>>((ref) {

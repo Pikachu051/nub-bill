@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/services/friend_service.dart';
 import 'package:nubbill/widgets/add_friend_modal.dart';
+import 'package:nubbill/widgets/retry_error_state.dart';
 
 class FriendsScreen extends ConsumerStatefulWidget {
   const FriendsScreen({super.key});
@@ -32,6 +33,15 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AsyncValue<int>>(friendshipsRealtimeProvider, (previous, next) {
+      final prevTick = previous?.valueOrNull;
+      final nextTick = next.valueOrNull;
+      if (nextTick != null && nextTick != prevTick) {
+        ref.invalidate(friendsProvider);
+        ref.invalidate(pendingRequestsProvider);
+      }
+    });
+
     final friendsAsync = ref.watch(friendsProvider);
     final requestsAsync = ref.watch(pendingRequestsProvider);
 
@@ -220,20 +230,12 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
         ),
       ),
       error: (err, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.grey),
-              const SizedBox(height: 16),
-              Text('เกิดข้อผิดพลาด: $err'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(friendsProvider),
-                child: const Text('ลองอีกครั้ง'),
-              ),
-            ],
-          ),
+        child: RetryErrorState(
+          error: err,
+          onRetry: () {
+            ref.invalidate(friendsProvider);
+            ref.invalidate(pendingRequestsProvider);
+          },
         ),
       ),
       data: (friends) {

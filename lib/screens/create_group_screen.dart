@@ -3,14 +3,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:nubbill/models/trip_member_model.dart';
+import 'package:nubbill/models/trip_model.dart';
+import 'package:nubbill/services/auth_repository.dart';
 import 'package:nubbill/services/trip_service.dart';
 import 'package:nubbill/services/friend_service.dart';
 import 'package:nubbill/providers/groups_provider.dart';
-import 'package:nubbill/config/theme.dart';
 import 'package:nubbill/screens/home_page.dart';
+import 'package:nubbill/widgets/retry_error_state.dart';
 
 class CreateGroupScreen extends ConsumerStatefulWidget {
-  const CreateGroupScreen({super.key});
+  final Trip? initialTrip;
+  final List<TripMember>? initialMembers;
+
+  const CreateGroupScreen({super.key, this.initialTrip, this.initialMembers});
 
   @override
   ConsumerState<CreateGroupScreen> createState() => _CreateGroupScreenState();
@@ -22,6 +28,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
   final _searchController = TextEditingController();
   bool _isLoading = false;
   File? _coverImage;
+  String? _initialCoverUrl;
 
   String _selectedCategory = 'travel';
   final List<String> _selectedMemberIds = [];
@@ -29,37 +36,62 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
   DateTime? _startDate;
   DateTime? _endDate;
 
-  // Category data matching the reference design
+  // Category data matching the reference design exactly
   final List<Map<String, dynamic>> _categories = [
     {
       'key': 'travel',
       'label': 'ออกทริป',
-      'icon': Icons.flight_takeoff,
-      'color': const Color(0xFFFFE4C4), // Peach/beige
-      'iconColor': const Color(0xFFF5A623),
+      'icon': Icons.flight,
+      'color': const Color(0xFFF1F8E9), // Light green
+      'iconColor': const Color(0xFFAED581),
     },
     {
       'key': 'accommodation',
       'label': 'ที่พัก',
       'icon': Icons.home,
-      'color': const Color(0xFFB3E5FC), // Light blue
-      'iconColor': const Color(0xFF03A9F4),
+      'color': const Color(0xFFE3F2FD), // Light blue
+      'iconColor': const Color(0xFF90CAF9),
     },
     {
       'key': 'romance',
       'label': 'หวานใจ',
       'icon': Icons.favorite,
-      'color': const Color(0xFFFFCDD2), // Light pink
-      'iconColor': const Color(0xFFE91E63),
+      'color': const Color(0xFFFCE4EC), // Light pink
+      'iconColor': const Color(0xFFF48FB1),
     },
     {
       'key': 'food',
-      'label': 'น้องอาหาร',
+      'label': 'มื้ออาหาร',
       'icon': Icons.restaurant,
-      'color': const Color(0xFFFFF9C4), // Light yellow
-      'iconColor': const Color(0xFFFFC107),
+      'color': const Color(0xFFFFFDE7), // Light yellow
+      'iconColor': const Color(0xFFFFCC80),
     },
   ];
+
+  bool get _isEditMode => widget.initialTrip != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final initialTrip = widget.initialTrip;
+    if (initialTrip != null) {
+      _nameController.text = initialTrip.name;
+      _selectedCategory = initialTrip.category.name;
+      _startDate = initialTrip.startDate;
+      _endDate = initialTrip.endDate;
+      _initialCoverUrl = initialTrip.coverUrl;
+
+      final currentUserId = ref.read(authUserIdProvider);
+      final selectedIds =
+          widget.initialMembers
+              ?.where((m) => m.userId != null && m.userId != currentUserId)
+              .map((m) => m.userId!)
+              .toSet() ??
+          <String>{};
+      _selectedMemberIds.addAll(selectedIds);
+    }
+  }
 
   @override
   void dispose() {
@@ -83,7 +115,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     }
   }
 
-  Future<void> _createGroup() async {
+  Future<void> _submitGroup() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
@@ -99,23 +131,70 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         startDate = endDate;
         endDate = tmp;
       }
+      final tripId = widget.initialTrip?.id;
 
-      // Create trip first
-      final trip = await tripService.createTrip(
-        name: name,
-        category: _selectedCategory,
-        startDate: startDate,
-        endDate: endDate,
-        memberIds: _selectedMemberIds.isNotEmpty ? _selectedMemberIds : null,
-      );
+      if (_isEditMode && tripId != null) {
+        await tripService.updateTrip(
+          tripId,
+          name: name,
+          category: _selectedCategory,
+          startDate: startDate,
+          endDate: endDate,
+        );
 
-      // Upload cover image if selected
-      if (_coverImage != null) {
+        // Sync member changes when editing.
+        final currentUserId = ref.read(authUserIdProvider);
+        final existingMemberByUserId = <String, String>{};
+        for (final member in widget.initialMembers ?? const <TripMember>[]) {
+          if (member.userId != null && member.userId != currentUserId) {
+            existingMemberByUserId[member.userId!] = member.id;
+          }
+        }
+
+        final selectedIds = _selectedMemberIds.toSet();
+        final existingIds = existingMemberByUserId.keys.toSet();
+
+        final toAdd = selectedIds.difference(existingIds);
+        final toRemove = existingIds.difference(selectedIds);
+
+        if (toAdd.isNotEmpty) {
+          await tripService.addMembers(tripId, userIds: toAdd.toList());
+        }
+
+        for (final userId in toRemove) {
+          final memberId = existingMemberByUserId[userId];
+          if (memberId != null) {
+            await tripService.removeMember(tripId, memberId);
+          }
+        }
+      } else {
+        // Create trip first
+        final trip = await tripService.createTrip(
+          name: name,
+          category: _selectedCategory,
+          startDate: startDate,
+          endDate: endDate,
+          memberIds: _selectedMemberIds.isNotEmpty ? _selectedMemberIds : null,
+        );
+
+        // Upload cover image if selected
+        if (_coverImage != null) {
+          try {
+            final bytes = await _coverImage!.readAsBytes();
+            await tripService.uploadCover(trip.id, bytes);
+          } catch (e) {
+            // Cover upload failed but trip was created successfully
+            debugPrint('Cover upload failed: $e');
+          }
+        }
+      }
+
+      // Upload new cover image if selected in edit mode
+      if (_isEditMode && tripId != null && _coverImage != null) {
         try {
           final bytes = await _coverImage!.readAsBytes();
-          await tripService.uploadCover(trip.id, bytes);
+          await tripService.uploadCover(tripId, bytes);
         } catch (e) {
-          // Cover upload failed but trip was created successfully
           debugPrint('Cover upload failed: $e');
         }
       }
@@ -123,12 +202,19 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       // Refresh home page data so the new group appears immediately
       ref.invalidate(groupsProvider);
       ref.invalidate(userTripsProvider);
+      if (tripId != null) {
+        ref.invalidate(tripDetailProvider(tripId));
+      }
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('สร้างกลุ่มสำเร็จ!')));
-        context.pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              _isEditMode ? 'อัปเดตกลุ่มสำเร็จ!' : 'สร้างกลุ่มสำเร็จ!',
+            ),
+          ),
+        );
+        context.pop(true);
       }
     } catch (e) {
       if (mounted) {
@@ -211,25 +297,25 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
             onTap: () => context.pop(),
             child: const Text(
               'ยกเลิก',
-              style: TextStyle(fontSize: 16, color: Colors.black87),
+              style: TextStyle(fontSize: 16, color: Color(0xFFBDBDBD)),
             ),
           ),
 
           // Title
-          const Text(
-            'เริ่มกลุ่มหารใหม่',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+          Text(
+            _isEditMode ? 'แก้ไขกลุ่ม' : 'เริ่มกลุ่มหารใหม่',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4A4A4A)),
           ),
 
           // Start Trip Button
           GestureDetector(
-            onTap: _isLoading ? null : _createGroup,
+            onTap: _isLoading ? null : _submitGroup,
             child: Text(
-              'เริ่มทริป!',
+              _isEditMode ? 'บันทึก' : 'เริ่มทริป!',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: _isLoading ? Colors.grey : AppTheme.primaryColor,
+                color: _isLoading ? Colors.grey : const Color(0xFF81CEF2),
               ),
             ),
           ),
@@ -259,9 +345,14 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                         image: FileImage(_coverImage!),
                         fit: BoxFit.cover,
                       )
+                    : _initialCoverUrl != null
+                    ? DecorationImage(
+                        image: NetworkImage(_initialCoverUrl!),
+                        fit: BoxFit.cover,
+                      )
                     : null,
               ),
-              child: _coverImage == null
+              child: _coverImage == null && _initialCoverUrl == null
                   ? const Icon(
                       Icons.camera_alt_outlined,
                       size: 32,
@@ -312,6 +403,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                   ),
                   style: const TextStyle(
                     fontSize: 18,
+                    color: Color(0xFF4A4A4A),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -323,8 +415,10 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     );
   }
 
+
+
   Widget _buildDateSection() {
-    String _formatDate(DateTime date) {
+    String formatDate(DateTime date) {
       final day = date.day.toString().padLeft(2, '0');
       final month = date.month.toString().padLeft(2, '0');
       final year = (date.year + 543).toString(); // Thai Buddhist year
@@ -337,12 +431,11 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
 
     String rangeLabel;
     if (hasBoth) {
-      rangeLabel =
-          '${_formatDate(_startDate!)} - ${_formatDate(_endDate!)}';
+      rangeLabel = '${formatDate(_startDate!)} - ${formatDate(_endDate!)}';
     } else if (hasStartOnly) {
-      rangeLabel = _formatDate(_startDate!);
+      rangeLabel = formatDate(_startDate!);
     } else if (hasEndOnly) {
-      rangeLabel = _formatDate(_endDate!);
+      rangeLabel = formatDate(_endDate!);
     } else {
       rangeLabel = 'เลือกวันที่เดินทาง';
     }
@@ -388,8 +481,11 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.calendar_today,
-                      size: 18, color: Colors.grey),
+                   const Icon(
+                    Icons.calendar_today,
+                    size: 18,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -519,40 +615,68 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                   final friend = selectedFriends[index];
                   return Column(
                     children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.grey[200],
-                          border: Border.all(color: Colors.white, width: 2),
-                        ),
-                        child: ClipOval(
-                          child: friend.avatarUrl != null
-                              ? Image.network(
-                                  friend.avatarUrl!,
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) =>
-                                      Center(
-                                        child: Text(
-                                          friend.nickname[0],
-                                          style: const TextStyle(
-                                            fontSize: 20,
-                                            fontWeight: FontWeight.w700,
+                      Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.grey[200],
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: ClipOval(
+                              child: friend.avatarUrl != null
+                                  ? Image.network(
+                                      friend.avatarUrl!,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) =>
+                                          Center(
+                                            child: Text(
+                                              friend.nickname[0],
+                                              style: const TextStyle(
+                                                fontSize: 20,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
                                           ),
+                                    )
+                                  : Center(
+                                      child: Text(
+                                        friend.nickname[0],
+                                        style: const TextStyle(
+                                          fontSize: 20,
+                                          fontWeight: FontWeight.w700,
                                         ),
                                       ),
-                                )
-                              : Center(
-                                  child: Text(
-                                    friend.nickname[0],
-                                    style: const TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700,
                                     ),
-                                  ),
+                            ),
+                          ),
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedMemberIds.remove(friend.id);
+                                });
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFF81CEF2),
+                                  shape: BoxShape.circle,
                                 ),
-                        ),
+                                child: const Icon(
+                                  Icons.close,
+                                  size: 14,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 4),
                       Text(
@@ -610,7 +734,10 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: friendsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (error, _) => Text('Error: $error'),
+        error: (error, _) => RetryErrorState(
+          error: error,
+          onRetry: () => ref.invalidate(friendsProvider),
+        ),
         data: (friends) {
           // Filter by search query
           final searchQuery = _searchController.text.toLowerCase();
@@ -634,7 +761,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                     style: const TextStyle(fontSize: 14, color: Colors.black54),
                   ),
                   Text(
-                    'เลือกแล้ว ${_selectedMemberIds.length}/50',
+                    '(เลือกแล้ว ${_selectedMemberIds.length}/50)',
                     style: const TextStyle(fontSize: 14, color: Colors.black54),
                   ),
                 ],
@@ -712,17 +839,18 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                             }
                           });
                         },
-                        child: Container(
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
                           width: 28,
                           height: 28,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: isSelected
-                                ? AppTheme.primaryColor
+                                ? const Color(0xFF81CEF2)
                                 : Colors.transparent,
                             border: Border.all(
                               color: isSelected
-                                  ? AppTheme.primaryColor
+                                  ? const Color(0xFF81CEF2)
                                   : Colors.grey.shade300,
                               width: 2,
                             ),

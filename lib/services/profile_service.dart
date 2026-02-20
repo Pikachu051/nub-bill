@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nubbill/services/auth_repository.dart';
 
 /// Provider for ProfileService
 final profileServiceProvider = Provider<ProfileService>((ref) {
@@ -7,7 +8,12 @@ final profileServiceProvider = Provider<ProfileService>((ref) {
 });
 
 /// Provider for current user profile
-final myProfileProvider = FutureProvider<UserProfile>((ref) async {
+final myProfileProvider = FutureProvider.autoDispose<UserProfile>((ref) async {
+  final userId = ref.watch(authUserIdProvider);
+  if (userId == null) {
+    throw Exception('User not authenticated');
+  }
+
   final service = ref.read(profileServiceProvider);
   return service.getMyProfile();
 });

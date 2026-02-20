@@ -1,19 +1,86 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nubbill/services/auth_repository.dart';
 
 /// Provider for FriendService
 final friendServiceProvider = Provider<FriendService>((ref) {
   return FriendService(Supabase.instance.client);
 });
 
+/// Realtime ticks for friendship changes affecting the current user.
+final friendshipsRealtimeProvider = StreamProvider.autoDispose<int>((ref) {
+  final userId = ref.watch(authUserIdProvider);
+  if (userId == null) {
+    return Stream<int>.value(0);
+  }
+
+  final supabase = Supabase.instance.client;
+  final controller = StreamController<int>.broadcast();
+  final channel = supabase.channel('friendships-$userId');
+  var tick = 0;
+
+  void emitTick() {
+    tick += 1;
+    controller.add(tick);
+  }
+
+  channel
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'friendships',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'user_a',
+          value: userId,
+        ),
+        callback: (_) => emitTick(),
+      )
+      .onPostgresChanges(
+        event: PostgresChangeEvent.all,
+        schema: 'public',
+        table: 'friendships',
+        filter: PostgresChangeFilter(
+          type: PostgresChangeFilterType.eq,
+          column: 'user_b',
+          value: userId,
+        ),
+        callback: (_) => emitTick(),
+      )
+      .subscribe();
+
+  controller.add(tick);
+
+  ref.onDispose(() async {
+    await channel.unsubscribe();
+    await controller.close();
+  });
+
+  return controller.stream;
+});
+
 /// Provider for friends list with balances
-final friendsProvider = FutureProvider<List<Friend>>((ref) async {
+final friendsProvider = FutureProvider.autoDispose<List<Friend>>((ref) async {
+  final userId = ref.watch(authUserIdProvider);
+  if (userId == null) return [];
+
+  ref.watch(friendshipsRealtimeProvider);
   final service = ref.read(friendServiceProvider);
   return service.getFriends();
 });
 
 /// Provider for pending friend requests
-final pendingRequestsProvider = FutureProvider<PendingRequests>((ref) async {
+final pendingRequestsProvider = FutureProvider.autoDispose<PendingRequests>((
+  ref,
+) async {
+  final userId = ref.watch(authUserIdProvider);
+  if (userId == null) {
+    return PendingRequests(incoming: const [], outgoing: const []);
+  }
+
+  ref.watch(friendshipsRealtimeProvider);
   final service = ref.read(friendServiceProvider);
   return service.getPendingRequests();
 });

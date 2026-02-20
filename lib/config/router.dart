@@ -24,11 +24,34 @@ import 'package:nubbill/screens/forgot_password_page.dart';
 import 'package:nubbill/screens/reset_password_page.dart';
 import 'package:nubbill/screens/add_expense_screen.dart';
 import 'package:nubbill/models/trip_member_model.dart';
+import 'package:nubbill/models/trip_model.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
+
+  CreateGroupScreen buildCreateGroupScreen(GoRouterState state) {
+    final extra = state.extra;
+    Trip? trip;
+    List<TripMember>? members;
+
+    if (extra is Map<String, dynamic>) {
+      final maybeTrip = extra['trip'];
+      final maybeMembers = extra['members'];
+
+      if (maybeTrip is Trip) {
+        trip = maybeTrip;
+      }
+      if (maybeMembers is List<TripMember>) {
+        members = maybeMembers;
+      } else if (maybeMembers is List) {
+        members = maybeMembers.whereType<TripMember>().toList();
+      }
+    }
+
+    return CreateGroupScreen(initialTrip: trip, initialMembers: members);
+  }
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
@@ -133,6 +156,8 @@ final routerProvider = Provider<GoRouter>((ref) {
             tripId: extra['tripId'] as String? ?? '',
             tripName: extra['tripName'] as String? ?? '',
             members: extra['members'] as List<TripMember>?,
+            expenseId: extra['expenseId'] as String?,
+            isEdit: extra['isEdit'] as bool? ?? false,
           );
         },
       ),
@@ -173,7 +198,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'groups/create',
                     parentNavigatorKey: rootNavigatorKey,
-                    builder: (context, state) => const CreateGroupScreen(),
+                    builder: (context, state) => buildCreateGroupScreen(state),
                   ),
                 ],
               ),
@@ -211,7 +236,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Route for group details (outside of shell for full screen)
       GoRoute(
         path: '/groups/create',
-        builder: (context, state) => const CreateGroupScreen(),
+        builder: (context, state) => buildCreateGroupScreen(state),
       ),
       GoRoute(
         path: '/groups/:id',

@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nubbill/config/api_config.dart';
 import 'package:nubbill/models/expense_model.dart';
 import 'package:nubbill/models/expense_detail_model.dart';
+import 'package:nubbill/services/auth_repository.dart';
 
 /// Provider for ExpenseService
 final expenseServiceProvider = Provider<ExpenseService>((ref) {
@@ -9,22 +10,24 @@ final expenseServiceProvider = Provider<ExpenseService>((ref) {
 });
 
 /// Provider for expenses in a specific trip (typed)
-final tripExpensesProvider = FutureProvider.family<List<Expense>, String>((
-  ref,
-  tripId,
-) async {
-  final service = ref.read(expenseServiceProvider);
-  return service.getTripExpenses(tripId);
-});
+final tripExpensesProvider = FutureProvider.autoDispose
+    .family<List<Expense>, String>((ref, tripId) async {
+      final userId = ref.watch(authUserIdProvider);
+      if (userId == null) return [];
+
+      final service = ref.read(expenseServiceProvider);
+      return service.getTripExpenses(tripId);
+    });
 
 /// Provider for a specific expense detail (typed)
-final expenseDetailProvider = FutureProvider.family<ExpenseDetail?, String>((
-  ref,
-  expenseId,
-) async {
-  final service = ref.read(expenseServiceProvider);
-  return service.getExpenseDetail(expenseId);
-});
+final expenseDetailProvider = FutureProvider.autoDispose
+    .family<ExpenseDetail?, String>((ref, expenseId) async {
+      final userId = ref.watch(authUserIdProvider);
+      if (userId == null) return null;
+
+      final service = ref.read(expenseServiceProvider);
+      return service.getExpenseDetail(expenseId);
+    });
 
 /// Service for Expense API calls
 class ExpenseService {
@@ -58,6 +61,7 @@ class ExpenseService {
     double? vatPercent,
     List<String>? splitMemberIds,
     List<Map<String, dynamic>>? splits,
+    List<Map<String, dynamic>>? payers,
     List<Map<String, dynamic>>? items,
   }) async {
     final body = <String, dynamic>{
@@ -67,13 +71,16 @@ class ExpenseService {
     };
 
     if (payerMemberId != null) body['payer_member_id'] = payerMemberId;
-    if (expenseDate != null)
+    if (expenseDate != null) {
       body['expense_date'] = expenseDate.toIso8601String().split('T')[0];
-    if (serviceChargePercent != null)
+    }
+    if (serviceChargePercent != null) {
       body['service_charge_percent'] = serviceChargePercent;
+    }
     if (vatPercent != null) body['vat_percent'] = vatPercent;
     if (splitMemberIds != null) body['split_member_ids'] = splitMemberIds;
     if (splits != null) body['splits'] = splits;
+    if (payers != null) body['payers'] = payers;
     if (items != null) body['items'] = items;
 
     final response = await _client.post('/trips/$tripId/expenses', body: body);
@@ -102,13 +109,32 @@ class ExpenseService {
     String? description,
     double? amount,
     DateTime? expenseDate,
+    String? splitType,
+    String? payerMemberId,
+    double? serviceChargePercent,
+    double? vatPercent,
+    List<String>? splitMemberIds,
+    List<Map<String, dynamic>>? splits,
+    List<Map<String, dynamic>>? payers,
+    List<Map<String, dynamic>>? items,
   }) async {
     final body = <String, dynamic>{};
 
     if (description != null) body['description'] = description;
     if (amount != null) body['amount'] = amount;
-    if (expenseDate != null)
+    if (expenseDate != null) {
       body['expense_date'] = expenseDate.toIso8601String().split('T')[0];
+    }
+    if (splitType != null) body['split_type'] = splitType;
+    if (payerMemberId != null) body['payer_member_id'] = payerMemberId;
+    if (serviceChargePercent != null) {
+      body['service_charge_percent'] = serviceChargePercent;
+    }
+    if (vatPercent != null) body['vat_percent'] = vatPercent;
+    if (splitMemberIds != null) body['split_member_ids'] = splitMemberIds;
+    if (splits != null) body['splits'] = splits;
+    if (payers != null) body['payers'] = payers;
+    if (items != null) body['items'] = items;
 
     final response = await _client.patch('/expenses/$expenseId', body: body);
 

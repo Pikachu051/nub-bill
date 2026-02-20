@@ -10,6 +10,7 @@ import 'package:nubbill/models/trip_member_model.dart';
 import 'package:nubbill/models/expense_model.dart';
 import 'package:nubbill/models/debt_entry_model.dart';
 import 'package:nubbill/config/supabase_config.dart';
+import 'package:nubbill/widgets/retry_error_state.dart';
 
 class GroupDetailPage extends ConsumerStatefulWidget {
   final String groupId;
@@ -125,8 +126,17 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (err, _) => Scaffold(
-        appBar: AppBar(title: const Text('Error')),
-        body: Center(child: Text('เกิดข้อผิดพลาด: $err')),
+        appBar: AppBar(title: const Text('เกิดข้อผิดพลาด')),
+        body: RetryErrorState(
+          error: err,
+          onRetry: () {
+            ref.invalidate(tripDetailProvider(widget.groupId));
+            ref.invalidate(tripExpensesProvider(widget.groupId));
+            ref.invalidate(tripDebtsProvider(widget.groupId));
+            ref.invalidate(tripBalancesProvider(widget.groupId));
+            _loadInitialData();
+          },
+        ),
       ),
       data: (detail) {
         if (detail == null) {
@@ -149,7 +159,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
           body: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
-                _buildSliverAppBar(trip),
+                _buildSliverAppBar(trip, detail, members),
                 SliverToBoxAdapter(child: _buildHeaderContent(trip, members)),
                 SliverPersistentHeader(
                   delegate: _SliverAppBarDelegate(
@@ -210,7 +220,11 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     );
   }
 
-  Widget _buildSliverAppBar(Trip trip) {
+  Widget _buildSliverAppBar(
+    Trip trip,
+    TripDetailResponse detail,
+    List<TripMember> members,
+  ) {
     return SliverAppBar(
       expandedHeight: 240.0,
       pinned: true,
@@ -242,8 +256,31 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
             ),
             child: IconButton(
               icon: const Icon(Icons.settings, color: Colors.white),
-              onPressed: () {
-                // Trip settings
+              onPressed: () async {
+                if (detail.myRole != 'admin') {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'เฉพาะผู้ดูแลกลุ่มเท่านั้นที่แก้ไขข้อมูลกลุ่มได้',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+
+                final updated = await context.push<bool>(
+                  '/groups/create',
+                  extra: {'trip': trip, 'members': members},
+                );
+
+                if (!mounted) return;
+
+                if (updated == true) {
+                  ref.invalidate(tripDetailProvider(widget.groupId));
+                  ref.invalidate(tripDebtsProvider(widget.groupId));
+                  ref.invalidate(tripBalancesProvider(widget.groupId));
+                  await _loadInitialData();
+                }
               },
             ),
           ),
@@ -251,10 +288,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       ],
       flexibleSpace: FlexibleSpaceBar(
         collapseMode: CollapseMode.parallax,
-        stretchModes: const [
-          StretchMode.zoomBackground,
-          StretchMode.fadeTitle,
-        ],
+        stretchModes: const [StretchMode.zoomBackground, StretchMode.fadeTitle],
         title: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -348,7 +382,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                             ),
                             const SizedBox(width: 4),
                             Text(
-                              '${trip.memberCount} คน',
+                              '${members.length} คน',
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 12,
@@ -684,7 +718,9 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
 
     final mySplit = expense.splits.where((s) => s.memberId == myId).toList();
     final myShare = mySplit.isNotEmpty ? mySplit.first.amount : 0.0;
-    final otherSplits = expense.splits.where((s) => s.memberId != myId).toList();
+    final otherSplits = expense.splits
+        .where((s) => s.memberId != myId)
+        .toList();
     final unpaidOtherSplits = otherSplits.where((s) => s.status != 'paid');
     final isPayer = expense.payerId == myId;
 
@@ -710,7 +746,9 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     if (myId == null) return 'คุณเคลียร์เรียบร้อยแล้ว';
 
     final isPayer = expense.payerId == myId;
-    final otherSplits = expense.splits.where((s) => s.memberId != myId).toList();
+    final otherSplits = expense.splits
+        .where((s) => s.memberId != myId)
+        .toList();
 
     if (!isPayer) {
       final payeeName = expense.payer?.displayName;
@@ -738,6 +776,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
   Widget _buildExpenseCard(Expense expense) {
     final status = _getBillStatus(expense);
     final displayAmount = _amountForStatus(expense, status);
+    final payerLabel = _buildPayerLabel(expense);
 
     // Find user's specific owe amount
     double? userOweAmount;
@@ -800,7 +839,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'แบบจ่าย ${expense.amount.toStringAsFixed(2)}฿',
+                      payerLabel,
                       style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                     ),
                   ],
@@ -819,6 +858,42 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
         ),
       ),
     );
+  }
+
+  String _buildPayerLabel(Expense expense) {
+    final payerNames = <String>[];
+
+    for (final payer in expense.payers) {
+      final name = payer.displayName.trim();
+      if (name.isNotEmpty && name != 'Unknown' && !payerNames.contains(name)) {
+        payerNames.add(name);
+      }
+    }
+
+    if (payerNames.isEmpty) {
+      final fallback = expense.payer?.displayName.trim();
+      if (fallback != null && fallback.isNotEmpty && fallback != 'Unknown') {
+        payerNames.add(fallback);
+      }
+    }
+
+    if (payerNames.isEmpty) {
+      return 'มีคนจ่าย';
+    }
+
+    if (payerNames.length == 1) {
+      return '${payerNames.first}จ่าย';
+    }
+
+    if (payerNames.length == 2) {
+      return '${payerNames[0]} และ ${payerNames[1]}'
+          'จ่าย';
+    }
+
+    final head = payerNames.sublist(0, payerNames.length - 1).join(', ');
+    final tail = payerNames.last;
+    return '$head และ $tail'
+        'จ่าย';
   }
 
   Widget _buildStatusLabel(
@@ -917,7 +992,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
   Widget _buildDebtsTab(AsyncValue<List<DebtEntry>> debtsAsync) {
     return debtsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => Center(child: Text('เกิดข้อผิดพลาด: $err')),
+      error: (err, _) => RetryErrorState(
+        error: err,
+        onRetry: () => ref.invalidate(tripDebtsProvider(widget.groupId)),
+      ),
       data: (debts) {
         if (debts.isEmpty) {
           return Center(

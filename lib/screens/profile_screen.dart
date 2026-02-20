@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nubbill/services/auth_repository.dart';
 import 'package:nubbill/services/profile_service.dart';
+import 'package:nubbill/widgets/retry_error_state.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
@@ -118,52 +119,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profileAsync = ref.watch(myProfileProvider);
-    final user = ref.watch(authRepositoryProvider).currentUser;
 
     return Scaffold(
       backgroundColor: Colors.white,
       body: profileAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) =>
-            _buildFallbackProfile(context, ref, user, err.toString()),
+        error: (err, _) => RetryErrorState(
+          error: err,
+          onRetry: () => ref.invalidate(myProfileProvider),
+        ),
         data: (profile) => _buildProfileContent(context, ref, profile),
-      ),
-    );
-  }
-
-  Widget _buildFallbackProfile(
-    BuildContext context,
-    WidgetRef ref,
-    dynamic user,
-    String error,
-  ) {
-    final nickname = user?.userMetadata?['nickname'] ?? 'ผู้ใช้งาน';
-
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          const SizedBox(height: 60),
-          _buildAvatar(nickname, null),
-          const SizedBox(height: 16),
-          Text(
-            nickname,
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(user?.email ?? '', style: const TextStyle(color: Colors.grey)),
-          const SizedBox(height: 16),
-          Text(
-            'ไม่สามารถโหลดข้อมูลได้: $error',
-            style: TextStyle(color: Colors.red[300], fontSize: 12),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: () => ref.invalidate(myProfileProvider),
-            child: const Text('ลองอีกครั้ง'),
-          ),
-          const SizedBox(height: 32),
-          _buildSettingsList(context, ref),
-        ],
       ),
     );
   }

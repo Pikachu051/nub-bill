@@ -21,6 +21,9 @@ class ExpenseDetail {
   // Splits with member profiles
   final List<ExpenseDetailSplit> splits;
 
+  // Multi-payer entries (optional)
+  final List<ExpenseDetailPayerEntry> payers;
+
   // Items (for itemized bills)
   final List<ExpenseDetailItem> items;
 
@@ -40,6 +43,7 @@ class ExpenseDetail {
     this.receiptUrl,
     this.payer,
     this.splits = const [],
+    this.payers = const [],
     this.items = const [],
   });
 
@@ -56,6 +60,12 @@ class ExpenseDetail {
     final splitsJson = json['expense_splits'] as List<dynamic>? ?? [];
     final splits = splitsJson
         .map((s) => ExpenseDetailSplit.fromJson(s as Map<String, dynamic>))
+        .toList();
+
+    // Parse payers
+    final payersJson = json['expense_payers'] as List<dynamic>? ?? [];
+    final payers = payersJson
+        .map((p) => ExpenseDetailPayerEntry.fromJson(p as Map<String, dynamic>))
         .toList();
 
     // Parse items
@@ -81,6 +91,7 @@ class ExpenseDetail {
       receiptUrl: json['receipt_url'] as String?,
       payer: payer,
       splits: splits,
+      payers: payers,
       items: items,
     );
   }
@@ -110,6 +121,43 @@ class ExpenseDetailPayer {
       id: json['id'] as String,
       userId: json['user_id'] as String?,
       ghostName: json['ghost_name'] as String?,
+      nickname: profiles?['nickname'] as String?,
+      avatarUrl: profiles?['avatar_url'] as String?,
+    );
+  }
+}
+
+/// Additional payer entry for multi-payer expenses
+class ExpenseDetailPayerEntry {
+  final String memberId;
+  final double amount;
+  final String? userId;
+  final String? ghostName;
+  final String? nickname;
+  final String? avatarUrl;
+
+  const ExpenseDetailPayerEntry({
+    required this.memberId,
+    required this.amount,
+    this.userId,
+    this.ghostName,
+    this.nickname,
+    this.avatarUrl,
+  });
+
+  String get displayName => nickname ?? ghostName ?? 'Unknown';
+
+  factory ExpenseDetailPayerEntry.fromJson(Map<String, dynamic> json) {
+    final payerMember = json['payer_member'] as Map<String, dynamic>?;
+    final profiles = payerMember?['profiles'] as Map<String, dynamic>?;
+
+    return ExpenseDetailPayerEntry(
+      memberId:
+          (json['member_id'] as String?) ??
+          (payerMember?['id'] as String? ?? ''),
+      amount: (json['amount'] as num?)?.toDouble() ?? 0,
+      userId: payerMember?['user_id'] as String?,
+      ghostName: payerMember?['ghost_name'] as String?,
       nickname: profiles?['nickname'] as String?,
       avatarUrl: profiles?['avatar_url'] as String?,
     );

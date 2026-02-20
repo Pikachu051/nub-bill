@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/providers/groups_provider.dart';
 import 'package:nubbill/widgets/group_card.dart';
+import 'package:nubbill/widgets/retry_error_state.dart';
 
 class GroupsScreen extends ConsumerWidget {
   const GroupsScreen({super.key});
@@ -61,7 +62,10 @@ class GroupsScreen extends ConsumerWidget {
             },
           );
         },
-        error: (err, stack) => Center(child: Text('เกิดข้อผิดพลาด: $err')),
+        error: (err, stack) => RetryErrorState(
+          error: err,
+          onRetry: () => ref.invalidate(groupsProvider),
+        ),
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
       floatingActionButton: FloatingActionButton(
