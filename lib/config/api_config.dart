@@ -18,9 +18,10 @@ class ApiConfig {
     const override = String.fromEnvironment('API_BASE_URL');
     if (override.isNotEmpty) return override;
 
-    if (kIsWeb) return 'http://localhost:3000';
-    if (Platform.isAndroid) return 'http://10.0.2.2:3000'; // Android emulator
-    return 'http://localhost:3000'; // iOS simulator / desktop
+    if (kIsWeb) return 'http://10.0.24.2:3001';
+    // if (Platform.isAndroid) return 'http://10.0.2.2:3000'; // Android emulator
+    if (Platform.isAndroid) return 'http://10.0.24.2:3001'; // Wireless Debugging
+    return 'http://10.0.24.2:3001'; // iOS simulator / desktop
   }
 
   /// API prefix
