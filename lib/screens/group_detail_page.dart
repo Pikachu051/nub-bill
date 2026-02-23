@@ -9,8 +9,17 @@ import 'package:nubbill/models/trip_model.dart';
 import 'package:nubbill/models/trip_member_model.dart';
 import 'package:nubbill/models/expense_model.dart';
 import 'package:nubbill/models/debt_entry_model.dart';
+import 'package:nubbill/models/balance_entry_model.dart';
 import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
+
+const _walletLoadTimeout = Duration(seconds: 5);
+
+final tripBalancesWithTimeoutProvider = FutureProvider.autoDispose
+    .family<List<BalanceEntry>, String>((ref, tripId) async {
+      final balancesFuture = ref.watch(tripBalancesProvider(tripId).future);
+      return balancesFuture.timeout(_walletLoadTimeout);
+    });
 
 class GroupDetailPage extends ConsumerStatefulWidget {
   final String groupId;
@@ -23,6 +32,12 @@ class GroupDetailPage extends ConsumerStatefulWidget {
 
 class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     with SingleTickerProviderStateMixin {
+  static const double _coverHeight = 280.0;
+  static const double _walletCardTopOverlap = 44.0;
+  static const double _walletCardEstimatedHeight = 132.0;
+  static const double _expandedHeaderHeight =
+      _coverHeight + _walletCardEstimatedHeight - _walletCardTopOverlap + 12.0;
+
   late TabController _tabController;
   StreamSubscription? _expenseSubscription;
 
@@ -93,6 +108,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
         // Refresh debts and balances
         ref.invalidate(tripDebtsProvider(widget.groupId));
         ref.invalidate(tripBalancesProvider(widget.groupId));
+        ref.invalidate(tripBalancesWithTimeoutProvider(widget.groupId));
       },
     );
   }
@@ -120,6 +136,9 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
   @override
   Widget build(BuildContext context) {
     final tripDetailAsync = ref.watch(tripDetailProvider(widget.groupId));
+    final balancesAsync = ref.watch(
+      tripBalancesWithTimeoutProvider(widget.groupId),
+    );
     final debtsAsync = ref.watch(tripDebtsProvider(widget.groupId));
 
     return tripDetailAsync.when(
@@ -134,6 +153,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
             ref.invalidate(tripExpensesProvider(widget.groupId));
             ref.invalidate(tripDebtsProvider(widget.groupId));
             ref.invalidate(tripBalancesProvider(widget.groupId));
+            ref.invalidate(tripBalancesWithTimeoutProvider(widget.groupId));
             _loadInitialData();
           },
         ),
@@ -159,18 +179,25 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
           body: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
-                _buildSliverAppBar(trip, detail, members),
-                SliverToBoxAdapter(child: _buildHeaderContent(trip, members)),
+                _buildSliverAppBar(trip, detail, members, balancesAsync),
                 SliverPersistentHeader(
                   delegate: _SliverAppBarDelegate(
                     TabBar(
                       controller: _tabController,
                       labelColor: const Color(0xFF81CEF2),
-                      unselectedLabelColor: const Color(0xFF9E9E9E), // Light grey
+                      unselectedLabelColor: const Color(
+                        0xFF9E9E9E,
+                      ), // Light grey
                       indicatorColor: const Color(0xFF81CEF2),
                       indicatorWeight: 3.0,
-                      labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
-                      unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.normal),
+                      labelStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.normal,
+                      ),
                       tabs: const [
                         Tab(text: 'รายการทั้งหมด'),
                         Tab(text: 'ใครติดเงินใคร'),
@@ -181,14 +208,17 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                 ),
               ];
             },
-            body: TabBarView(
-              controller: _tabController,
-              children: [
-                // Tab 1: Bill list
-                _buildExpensesTab(),
-                // Tab 2: Who Owes Who (pairwise debts)
-                _buildDebtsTab(debtsAsync),
-              ],
+            body: ColoredBox(
+              color: Colors.white,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Tab 1: Bill list
+                  _buildExpensesTab(),
+                  // Tab 2: Who Owes Who (pairwise debts)
+                  _buildDebtsTab(debtsAsync),
+                ],
+              ),
             ),
           ),
           floatingActionButton: FloatingActionButton.extended(
@@ -227,9 +257,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     Trip trip,
     TripDetailResponse detail,
     List<TripMember> members,
+    AsyncValue<List<BalanceEntry>> balancesAsync,
   ) {
     return SliverAppBar(
-      expandedHeight: 280.0,
+      expandedHeight: _expandedHeaderHeight,
       pinned: true,
       stretch: true,
       backgroundColor: const Color(0xFF81CEF2),
@@ -242,7 +273,11 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
             shape: BoxShape.circle,
           ),
           child: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: Colors.white,
+              size: 20,
+            ),
             onPressed: () {
               Navigator.of(context).maybePop();
             },
@@ -282,6 +317,9 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                   ref.invalidate(tripDetailProvider(widget.groupId));
                   ref.invalidate(tripDebtsProvider(widget.groupId));
                   ref.invalidate(tripBalancesProvider(widget.groupId));
+                  ref.invalidate(
+                    tripBalancesWithTimeoutProvider(widget.groupId),
+                  );
                   await _loadInitialData();
                 }
               },
@@ -296,57 +334,89 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
           // Typical height when pinned is kToolbarHeight + safe area top
           final safeAreaTop = MediaQuery.of(context).padding.top;
           final pinnedHeight = kToolbarHeight + safeAreaTop;
-          
+
           double collapseFraction = 0.0;
           if (top <= pinnedHeight) {
             collapseFraction = 1.0;
-          } else if (top < 280.0) {
-            collapseFraction = 1.0 - ((top - pinnedHeight) / (280.0 - pinnedHeight));
+          } else if (top < _expandedHeaderHeight) {
+            collapseFraction =
+                1.0 -
+                ((top - pinnedHeight) / (_expandedHeaderHeight - pinnedHeight));
           }
 
           // We want the pinned title to start appearing late in the scroll
           final titleOpacity = (collapseFraction - 0.7).clamp(0.0, 0.3) / 0.3;
           // We want the expanded badges/titles to fade out early
           final expandedOpacity = (1 - (collapseFraction * 2)).clamp(0.0, 1.0);
+          // Fade wallet card out while collapsing so it doesn't stay pinned on top.
+          final walletOpacity = (1 - (collapseFraction * 2.2)).clamp(0.0, 1.0);
+          final walletState = _resolveWalletState(
+            balancesAsync,
+            detail.myMemberId ?? _myMemberId,
+          );
+          final shortWalletText = walletState.hasBalanceData
+              ? 'สถานะ: ${walletState.netBalance! >= 0 ? "รอรับเงิน" : "ค้างจ่าย"} ${walletState.netBalance!.abs().toStringAsFixed(2)}฿'
+              : (walletState.isLoading
+                    ? 'สถานะ: กำลังโหลด...'
+                    : walletState.hasTimedOut
+                    ? 'สถานะ: โหลดข้อมูลไม่สำเร็จ'
+                    : 'สถานะ: ไม่พบข้อมูล');
+          final shortWalletColor = walletState.hasBalanceData
+              ? (walletState.netBalance! >= 0
+                    ? Colors.greenAccent
+                    : const Color(0xFFFF5252))
+              : Colors.white;
 
           return Stack(
             fit: StackFit.expand,
             children: [
-              if (trip.coverUrl != null)
-                Image.network(trip.coverUrl!, fit: BoxFit.cover)
-              else
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        const Color(0xFF81CEF2),
-                        const Color(0xFF81CEF2).withValues(alpha: 0.7),
-                      ],
+              Container(color: Colors.grey[50]),
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                height: _coverHeight,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (trip.coverUrl != null)
+                      Image.network(trip.coverUrl!, fit: BoxFit.cover)
+                    else
+                      Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              const Color(0xFF81CEF2),
+                              const Color(0xFF81CEF2).withValues(alpha: 0.7),
+                            ],
+                          ),
+                        ),
+                        child: Center(
+                          child: Icon(
+                            trip.category.icon,
+                            size: 80,
+                            color: Colors.white.withValues(alpha: 0.3),
+                          ),
+                        ),
+                      ),
+                    // Gradient overlay
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.3),
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.6),
+                          ],
+                          stops: const [0.0, 0.5, 1.0],
+                        ),
+                      ),
                     ),
-                  ),
-                  child: Center(
-                    child: Icon(
-                      trip.category.icon,
-                      size: 80,
-                      color: Colors.white.withValues(alpha: 0.3),
-                    ),
-                  ),
-                ),
-              // Gradient overlay
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.black.withValues(alpha: 0.3),
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.6),
-                    ],
-                    stops: const [0.0, 0.5, 1.0],
-                  ),
+                  ],
                 ),
               ),
               // Solid App Bar Fade
@@ -360,7 +430,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
               // Pinned Center Title
               if (titleOpacity > 0)
                 Positioned(
-                  top: safeAreaTop + (kToolbarHeight - 44) / 2, // Exact vertical offset for 44px content
+                  top:
+                      safeAreaTop +
+                      (kToolbarHeight - 44) /
+                          2, // Exact vertical offset for 44px content
                   left: 60,
                   right: 60,
                   child: Opacity(
@@ -380,13 +453,11 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                           overflow: TextOverflow.ellipsis,
                         ),
                         Text(
-                          'สถานะ: ${trip.balance >= 0 ? "รอรับเงิน" : "ค้างจ่าย"} ${trip.balance.abs().toStringAsFixed(2)}฿',
+                          shortWalletText,
                           style: TextStyle(
-                            color: trip.balance >= 0
-                                ? Colors.greenAccent
-                                : const Color(0xFFFF5252),
+                            color: shortWalletColor,
                             fontSize: 12,
-                            fontWeight: FontWeight.w400,
+                            fontWeight: FontWeight.bold,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -397,7 +468,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                 ),
               // Trip Info Badges (Original expanded layout)
               Positioned(
-                bottom: 24, // Gracefully sit above the app bar edge
+                bottom:
+                    (_expandedHeaderHeight - _coverHeight) +
+                    _walletCardTopOverlap +
+                    28,
                 left: 20,
                 right: 20,
                 child: AnimatedOpacity(
@@ -506,7 +580,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
-                                    _formatDateRange(trip.startDate!, trip.endDate),
+                                    _formatDateRange(
+                                      trip.startDate!,
+                                      trip.endDate,
+                                    ),
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 12,
@@ -522,6 +599,21 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                   ),
                 ),
               ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 12,
+                child: IgnorePointer(
+                  ignoring: walletOpacity < 0.05,
+                  child: Opacity(
+                    opacity: walletOpacity,
+                    child: Transform.translate(
+                      offset: Offset(0, -24 * (1 - walletOpacity)),
+                      child: _buildWalletCard(walletState),
+                    ),
+                  ),
+                ),
+              ),
             ],
           );
         },
@@ -529,106 +621,179 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     );
   }
 
-  Widget _buildHeaderContent(Trip trip, List<TripMember> members) {
+  _WalletState _resolveWalletState(
+    AsyncValue<List<BalanceEntry>> balancesAsync,
+    String? myMemberId,
+  ) {
+    final walletError = balancesAsync.maybeWhen<Object?>(
+      error: (error, _) => error,
+      orElse: () => null,
+    );
+    final isLoading = balancesAsync.isLoading;
+    final hasTimedOut = walletError is TimeoutException;
+
+    final myBalanceEntry = balancesAsync.maybeWhen(
+      data: (entries) {
+        if (myMemberId == null) return null;
+        for (final entry in entries) {
+          if (entry.memberId == myMemberId) {
+            return entry;
+          }
+        }
+        return null;
+      },
+      orElse: () => null,
+    );
+
+    return _WalletState(
+      netBalance: myBalanceEntry?.net,
+      isLoading: isLoading,
+      hasTimedOut: hasTimedOut,
+    );
+  }
+
+  Widget _buildWalletCard(_WalletState walletState) {
+    final hasBalanceData = walletState.hasBalanceData;
+    final netBalance = walletState.netBalance;
+    final statusLabel = hasBalanceData
+        ? (netBalance! >= 0 ? 'รอรับเงิน' : 'ค้างจ่าย')
+        : (walletState.isLoading
+              ? 'กำลังโหลด...'
+              : walletState.hasTimedOut
+              ? 'โหลดข้อมูลไม่สำเร็จ'
+              : 'ไม่พบข้อมูล');
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Personal Balance Card
-          Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(24),
-              ),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'สถานะกระเป๋าตังค์',
-                            style: TextStyle(
-                                color: Color(0xFF4A4A4A),
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            trip.balance >= 0 ? 'รอรับเงิน' : 'ค้างจ่าย',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF757575),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        '${trip.balance >= 0 ? "" : "- "}${trip.balance.abs().toStringAsFixed(2)}฿',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: trip.balance >= 0
-                              ? Colors.green
-                              : const Color(0xFFFF5252),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () {
-                            context.push('/payment');
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF81CEF2),
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            elevation: 0,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                          ),
-                          icon: const Icon(Icons.account_balance_wallet, size: 20),
-                          label: const Text(
-                            'จัดการยอดเงิน',
-                            style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Container(
-                        decoration: BoxDecoration(
-                          border: Border.all(color: const Color(0xFF81CEF2), width: 1.5),
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: IconButton(
-                          padding: const EdgeInsets.all(12),
-                          onPressed: () {
-                            // Show chart/summary
-                          },
-                          icon: const Icon(
-                            Icons.bar_chart,
-                            color: Color(0xFF81CEF2),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
-      );
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'สถานะกระเป๋าตังค์',
+                      style: TextStyle(
+                        color: Color(0xFF4A4A4A),
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      statusLabel,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF757575),
+                      ),
+                    ),
+                  ],
+                ),
+                if (hasBalanceData)
+                  Text(
+                    '${netBalance! >= 0 ? "" : "- "}${netBalance.abs().toStringAsFixed(2)}฿',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: netBalance >= 0
+                          ? Colors.green
+                          : const Color(0xFFFF5252),
+                    ),
+                  )
+                else if (walletState.isLoading)
+                  const _WalletAmountShimmer()
+                else
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFF81CEF2)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: IconButton(
+                      tooltip: 'ลองโหลดใหม่',
+                      onPressed: () {
+                        ref.invalidate(tripBalancesProvider(widget.groupId));
+                        ref.invalidate(
+                          tripBalancesWithTimeoutProvider(widget.groupId),
+                        );
+                      },
+                      icon: Icon(
+                        walletState.hasTimedOut
+                            ? Icons.refresh
+                            : Icons.refresh_outlined,
+                        color: const Color(0xFF81CEF2),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      context.push(
+                        '/manage-balance',
+                        extra: {'groupId': widget.groupId},
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF81CEF2),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    icon: const Icon(Icons.account_balance_wallet, size: 20),
+                    label: const Text(
+                      'จัดการยอดเงิน',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: const Color(0xFF81CEF2),
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: IconButton(
+                    padding: const EdgeInsets.all(12),
+                    onPressed: () {
+                      // Show chart/summary
+                    },
+                    icon: const Icon(Icons.bar_chart, color: Color(0xFF81CEF2)),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   String _formatDateRange(DateTime start, DateTime? end) {
@@ -671,7 +836,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
         Widget? dateHeader;
         final currentDate = _parseExpenseDate(expense.expenseDate);
         if (index == 0) {
-          dateHeader = _buildDateHeader(currentDate);
+          dateHeader = _buildDateHeader(currentDate, isFirstHeader: true);
         } else {
           final prevDate = _parseExpenseDate(_expenses[index - 1].expenseDate);
           if (!_isSameDay(currentDate, prevDate)) {
@@ -698,7 +863,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  Widget _buildDateHeader(DateTime date) {
+  Widget _buildDateHeader(DateTime date, {bool isFirstHeader = false}) {
     // Format Thai-style date
     final thaiMonths = [
       '',
@@ -719,7 +884,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     final dateText = '${date.day} ${thaiMonths[date.month]} $thaiYear';
 
     return Padding(
-      padding: const EdgeInsets.only(top: 16, bottom: 8),
+      padding: EdgeInsets.only(top: isFirstHeader ? 0 : 16, bottom: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -732,7 +897,9 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
             ),
           ),
           // Only show filter icon on the first date
-          if (dateText == '${DateTime.now().day} ${thaiMonths[DateTime.now().month]} ${DateTime.now().year + 543}' || true) // Hardcoding for exact match placeholder
+          if (dateText ==
+                  '${DateTime.now().day} ${thaiMonths[DateTime.now().month]} ${DateTime.now().year + 543}' ||
+              true) // Hardcoding for exact match placeholder
             Icon(Icons.tune, size: 20, color: const Color(0xFF4A4A4A)),
         ],
       ),
@@ -859,9 +1026,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 0,
       color: Colors.transparent,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () async {
@@ -1176,7 +1341,11 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
             // Navigate to payment
             context.push(
               '/payment',
-              extra: {'amount': debt.amount, 'memberId': debt.toMemberId},
+              extra: {
+                'amount': debt.amount,
+                'memberId': debt.toMemberId,
+                'tripId': widget.groupId,
+              },
             );
           }
         },
@@ -1246,6 +1415,74 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
   // =========================================================================
 }
 
+class _WalletAmountShimmer extends StatefulWidget {
+  const _WalletAmountShimmer();
+
+  @override
+  State<_WalletAmountShimmer> createState() => _WalletAmountShimmerState();
+}
+
+class _WalletAmountShimmerState extends State<_WalletAmountShimmer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return ShaderMask(
+          blendMode: BlendMode.srcATop,
+          shaderCallback: (rect) {
+            final dx = (_controller.value * 2) - 1;
+            return LinearGradient(
+              begin: Alignment(dx - 1, 0),
+              end: Alignment(dx + 1, 0),
+              colors: const [
+                Color(0xFFE6E9EE),
+                Color(0xFFF4F7FB),
+                Color(0xFFE6E9EE),
+              ],
+            ).createShader(rect);
+          },
+          child: child,
+        );
+      },
+      child: Container(
+        width: 88,
+        height: 24,
+        decoration: BoxDecoration(
+          color: const Color(0xFFE6E9EE),
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+}
+
+class _WalletState {
+  final double? netBalance;
+  final bool isLoading;
+  final bool hasTimedOut;
+
+  const _WalletState({
+    required this.netBalance,
+    required this.isLoading,
+    required this.hasTimedOut,
+  });
+
+  bool get hasBalanceData => netBalance != null;
+}
+
 /// Bill status for current user
 enum _BillStatus {
   youOwe, // You have unpaid split
@@ -1273,7 +1510,14 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
   ) {
     return Container(
-      color: Colors.white,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: _tabBar,
     );
   }

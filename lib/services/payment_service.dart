@@ -90,6 +90,60 @@ class PaymentService {
     return QrPaymentData.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// Create settlement for manual verification flow.
+  ///
+  /// Uses the same endpoint as QR generation and returns the created settlement ID.
+  Future<String> createSettlementForManualVerify({
+    required String payerMemberId,
+    required String payeeMemberId,
+    required String tripId,
+    required double amount,
+    required List<String> expenseSplitIds,
+  }) async {
+    final createSettlementResponse = await _client.post(
+      '/payment/create-settlement',
+      body: {
+        'payer_member_id': payerMemberId,
+        'payee_member_id': payeeMemberId,
+        'trip_id': tripId,
+        'amount': amount,
+        'expense_split_ids': expenseSplitIds,
+      },
+    );
+
+    if (createSettlementResponse.isSuccess &&
+        createSettlementResponse.data != null) {
+      final data = createSettlementResponse.data as Map<String, dynamic>;
+      final settlementId = data['settlement_id'] as String?;
+      if (settlementId != null && settlementId.isNotEmpty) {
+        return settlementId;
+      }
+    }
+
+    // Backward compatibility fallback when backend does not support /create-settlement.
+    final response = await _client.post(
+      '/payment/generate-qr',
+      body: {
+        'payee_member_id': payeeMemberId,
+        'trip_id': tripId,
+        'amount': amount,
+        'expense_split_ids': expenseSplitIds,
+      },
+    );
+
+    if (!response.isSuccess || response.data == null) {
+      throw Exception(response.error ?? 'Failed to create settlement');
+    }
+
+    final data = response.data as Map<String, dynamic>;
+    final settlementId = data['settlement_id'] as String?;
+    if (settlementId == null || settlementId.isEmpty) {
+      throw Exception('ไม่สามารถสร้างรายการยืนยันรับเงินได้');
+    }
+
+    return settlementId;
+  }
+
   /// POST /api/payment/verify-slip - Upload and verify payment slip
   Future<SlipVerificationResult> verifySlip({
     required String settlementId,
@@ -123,6 +177,22 @@ class PaymentService {
 
     if (!response.isSuccess || response.data == null) {
       throw Exception(response.error ?? 'Failed to get settlement status');
+    }
+
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// POST /api/payment/manual-verify - Verify payment manually (without slip)
+  Future<Map<String, dynamic>> manualVerify({
+    required String settlementId,
+  }) async {
+    final response = await _client.post(
+      '/payment/manual-verify',
+      body: {'settlement_id': settlementId},
+    );
+
+    if (!response.isSuccess || response.data == null) {
+      throw Exception(response.error ?? 'Failed to manually verify payment');
     }
 
     return response.data as Map<String, dynamic>;
