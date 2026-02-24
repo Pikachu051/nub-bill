@@ -13,6 +13,7 @@ import 'package:nubbill/screens/scaffold_with_navbar.dart';
 import 'package:nubbill/screens/create_group_screen.dart';
 import 'package:nubbill/screens/bill_details_page.dart';
 import 'package:nubbill/screens/payment_screen.dart';
+import 'package:nubbill/screens/manage_balance_page.dart';
 import 'package:nubbill/screens/upload_slip_screen.dart';
 import 'package:nubbill/screens/group_detail_page.dart';
 import 'package:nubbill/screens/friends_screen.dart';
@@ -24,11 +25,34 @@ import 'package:nubbill/screens/forgot_password_page.dart';
 import 'package:nubbill/screens/reset_password_page.dart';
 import 'package:nubbill/screens/add_expense_screen.dart';
 import 'package:nubbill/models/trip_member_model.dart';
+import 'package:nubbill/models/trip_model.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authRepository = ref.watch(authRepositoryProvider);
+
+  CreateGroupScreen buildCreateGroupScreen(GoRouterState state) {
+    final extra = state.extra;
+    Trip? trip;
+    List<TripMember>? members;
+
+    if (extra is Map<String, dynamic>) {
+      final maybeTrip = extra['trip'];
+      final maybeMembers = extra['members'];
+
+      if (maybeTrip is Trip) {
+        trip = maybeTrip;
+      }
+      if (maybeMembers is List<TripMember>) {
+        members = maybeMembers;
+      } else if (maybeMembers is List) {
+        members = maybeMembers.whereType<TripMember>().toList();
+      }
+    }
+
+    return CreateGroupScreen(initialTrip: trip, initialMembers: members);
+  }
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
@@ -133,12 +157,45 @@ final routerProvider = Provider<GoRouter>((ref) {
             tripId: extra['tripId'] as String? ?? '',
             tripName: extra['tripName'] as String? ?? '',
             members: extra['members'] as List<TripMember>?,
+            expenseId: extra['expenseId'] as String?,
+            isEdit: extra['isEdit'] as bool? ?? false,
           );
         },
       ),
       GoRoute(
         path: '/payment',
-        builder: (context, state) => const PaymentScreen(),
+        builder: (context, state) {
+          final extra = state.extra;
+          if (extra is Map<String, dynamic>) {
+            final splitIdsRaw = extra['expenseSplitIds'];
+            List<String>? splitIds;
+            if (splitIdsRaw is List<String>) {
+              splitIds = splitIdsRaw;
+            } else if (splitIdsRaw is List) {
+              splitIds = splitIdsRaw.map((item) => item.toString()).toList();
+            }
+
+            return PaymentScreen(
+              amount: (extra['amount'] as num?)?.toDouble() ?? 0,
+              memberId: extra['memberId'] as String?,
+              tripId: extra['tripId'] as String?,
+              expenseSplitIds: splitIds,
+            );
+          }
+          return const PaymentScreen();
+        },
+      ),
+      GoRoute(
+        path: '/manage-balance',
+        builder: (context, state) {
+          final extra = state.extra;
+          String groupId = '';
+          if (extra is Map<String, dynamic>) {
+            groupId = extra['groupId'] as String? ?? '';
+          }
+
+          return ManageBalancePage(groupId: groupId);
+        },
       ),
       GoRoute(
         path: '/upload_slip',
@@ -173,7 +230,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                   GoRoute(
                     path: 'groups/create',
                     parentNavigatorKey: rootNavigatorKey,
-                    builder: (context, state) => const CreateGroupScreen(),
+                    builder: (context, state) => buildCreateGroupScreen(state),
                   ),
                 ],
               ),
@@ -211,7 +268,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       // Route for group details (outside of shell for full screen)
       GoRoute(
         path: '/groups/create',
-        builder: (context, state) => const CreateGroupScreen(),
+        builder: (context, state) => buildCreateGroupScreen(state),
       ),
       GoRoute(
         path: '/groups/:id',

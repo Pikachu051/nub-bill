@@ -7,6 +7,21 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(SupabaseConfig.client);
 });
 
+/// Shared auth stream provider.
+///
+/// Use this as a dependency for user-scoped providers so cached data is
+/// invalidated when account/session changes.
+final authStateChangesProvider = StreamProvider<AuthState>((ref) {
+  final repository = ref.watch(authRepositoryProvider);
+  return repository.authStateChanges;
+});
+
+/// Current authenticated user id (null when logged out).
+final authUserIdProvider = Provider<String?>((ref) {
+  ref.watch(authStateChangesProvider);
+  return ref.watch(authRepositoryProvider).currentUser?.id;
+});
+
 class AuthRepository {
   final SupabaseClient _client;
 

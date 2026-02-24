@@ -14,13 +14,33 @@ class SupabaseConfig {
   static const String anonKey =
       'sb_publishable_kkUfZhEd0UKICqGl3skU-g_vnvfbNOu';
 
-  /// Initialize Supabase - call this in main() before runApp()
+  static bool _initialized = false;
+  static Future<void>? _initializing;
+
+  /// Initialize Supabase once at app bootstrap.
   static Future<void> initialize() async {
-    await Supabase.initialize(url: url, anonKey: anonKey);
+    if (_initialized) return;
+    if (_initializing != null) {
+      await _initializing;
+      return;
+    }
+
+    _initializing = Supabase.initialize(url: url, anonKey: anonKey);
+    try {
+      await _initializing;
+      _initialized = true;
+    } finally {
+      _initializing = null;
+    }
   }
 
   /// Get the Supabase client instance
-  static SupabaseClient get client => Supabase.instance.client;
+  static SupabaseClient get client {
+    if (!_initialized) {
+      throw StateError('Supabase is not initialized yet');
+    }
+    return Supabase.instance.client;
+  }
 
   /// Get the current user (null if not logged in)
   static User? get currentUser => client.auth.currentUser;

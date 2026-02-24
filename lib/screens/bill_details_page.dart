@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/services/expense_service.dart';
+import 'package:nubbill/services/auth_repository.dart';
 import 'package:nubbill/models/expense_model.dart';
 import 'package:nubbill/models/expense_detail_model.dart';
+import 'package:nubbill/widgets/retry_error_state.dart';
 
 class BillDetailsPage extends ConsumerWidget {
   final String expenseId;
@@ -13,6 +15,7 @@ class BillDetailsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final expenseAsync = ref.watch(expenseDetailProvider(expenseId));
+    final currentUserId = ref.watch(authUserIdProvider);
 
     return expenseAsync.when(
       loading: () => Scaffold(
@@ -35,7 +38,10 @@ class BillDetailsPage extends ConsumerWidget {
             onPressed: () => context.pop(),
           ),
         ),
-        body: Center(child: Text('เกิดข้อผิดพลาด: $err')),
+        body: RetryErrorState(
+          error: err,
+          onRetry: () => ref.invalidate(expenseDetailProvider(expenseId)),
+        ),
       ),
       data: (detail) {
         if (detail == null) {
@@ -45,7 +51,10 @@ class BillDetailsPage extends ConsumerWidget {
           );
         }
 
-        return _buildContent(context, ref, detail);
+        final canManageExpense =
+            currentUserId != null && detail.createdBy == currentUserId;
+
+        return _buildContent(context, ref, detail, canManageExpense);
       },
     );
   }
@@ -54,6 +63,7 @@ class BillDetailsPage extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     ExpenseDetail detail,
+    bool canManageExpense,
   ) {
     final date = DateTime.tryParse(detail.expenseDate) ?? DateTime.now();
 
@@ -79,22 +89,29 @@ class BillDetailsPage extends ConsumerWidget {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => context.pop(),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.edit, color: Color(0xFF81CEF2)),
-            onPressed: () {
-              // Navigate to edit mode
-              context.push(
-                '/add_expense',
-                extra: {
-                  'tripId': detail.tripId,
-                  'expenseId': detail.id,
-                  'isEdit': true,
-                },
-              );
-            },
-          ),
-        ],
+        actions: canManageExpense
+            ? [
+                IconButton(
+                  icon: const Icon(Icons.edit, color: Color(0xFF81CEF2)),
+                  onPressed: () async {
+                    final updated = await context.push<bool>(
+                      '/add_expense',
+                      extra: {
+                        'tripId': detail.tripId,
+                        'tripName': '',
+                        'expenseId': detail.id,
+                        'isEdit': true,
+                      },
+                    );
+
+                    if (updated == true && context.mounted) {
+                      ref.invalidate(expenseDetailProvider(expenseId));
+                      context.pop(true);
+                    }
+                  },
+                ),
+              ]
+            : const [],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -109,9 +126,11 @@ class BillDetailsPage extends ConsumerWidget {
             const SizedBox(height: 12),
             // Participant list
             ...detail.splits.map((split) => _buildParticipantCard(split)),
-            const SizedBox(height: 24),
-            // Delete button
-            _buildDeleteButton(context, ref, detail),
+            if (canManageExpense) ...[
+              const SizedBox(height: 24),
+              // Delete button
+              _buildDeleteButton(context, ref, detail),
+            ],
             const SizedBox(height: 32),
           ],
         ),

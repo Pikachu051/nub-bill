@@ -11,6 +11,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nubbill/config/supabase_config.dart';
+import 'package:nubbill/services/auth_repository.dart';
 
 /// Realtime event types
 enum RealtimeEventType { insert, update, delete }
@@ -230,8 +231,8 @@ final realtimeServiceProvider = Provider<RealtimeService>((ref) {
 });
 
 /// Stream provider for trip expenses (use in widgets)
-final tripExpensesStreamProvider =
-    StreamProvider.family<List<Map<String, dynamic>>, String>((ref, tripId) {
+final tripExpensesStreamProvider = StreamProvider.autoDispose
+    .family<List<Map<String, dynamic>>, String>((ref, tripId) {
       final service = ref.watch(realtimeServiceProvider);
       final controller =
           StreamController<List<Map<String, dynamic>>>.broadcast();
@@ -280,34 +281,40 @@ final tripExpensesStreamProvider =
     });
 
 /// Stream provider for user notifications
-final notificationsStreamProvider = StreamProvider<List<Map<String, dynamic>>>((
-  ref,
-) {
-  final service = ref.watch(realtimeServiceProvider);
-  final controller = StreamController<List<Map<String, dynamic>>>.broadcast();
+final notificationsStreamProvider =
+    StreamProvider.autoDispose<List<Map<String, dynamic>>>((ref) {
+      final userId = ref.watch(authUserIdProvider);
+      if (userId == null) {
+        return Stream<List<Map<String, dynamic>>>.value([]);
+      }
 
-  List<Map<String, dynamic>> notifications = [];
-  controller.add(notifications);
+      final service = ref.watch(realtimeServiceProvider);
+      final controller =
+          StreamController<List<Map<String, dynamic>>>.broadcast();
 
-  try {
-    final subscription = service.subscribeToNotifications(
-      onEvent: (event) {
-        if (event.type == RealtimeEventType.insert && event.newRecord != null) {
-          // Add new notification at the beginning
-          notifications = [event.newRecord!, ...notifications];
-          controller.add(notifications);
-        }
-      },
-    );
+      List<Map<String, dynamic>> notifications = [];
+      controller.add(notifications);
 
-    ref.onDispose(() {
-      subscription.cancel();
-      controller.close();
+      try {
+        final subscription = service.subscribeToNotifications(
+          onEvent: (event) {
+            if (event.type == RealtimeEventType.insert &&
+                event.newRecord != null) {
+              // Add new notification at the beginning
+              notifications = [event.newRecord!, ...notifications];
+              controller.add(notifications);
+            }
+          },
+        );
+
+        ref.onDispose(() {
+          subscription.cancel();
+          controller.close();
+        });
+      } catch (e) {
+        // User not authenticated, just return empty stream
+        controller.add([]);
+      }
+
+      return controller.stream;
     });
-  } catch (e) {
-    // User not authenticated, just return empty stream
-    controller.add([]);
-  }
-
-  return controller.stream;
-});

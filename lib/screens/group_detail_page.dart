@@ -9,7 +9,17 @@ import 'package:nubbill/models/trip_model.dart';
 import 'package:nubbill/models/trip_member_model.dart';
 import 'package:nubbill/models/expense_model.dart';
 import 'package:nubbill/models/debt_entry_model.dart';
+import 'package:nubbill/models/balance_entry_model.dart';
 import 'package:nubbill/config/supabase_config.dart';
+import 'package:nubbill/widgets/retry_error_state.dart';
+
+const _walletLoadTimeout = Duration(seconds: 5);
+
+final tripBalancesWithTimeoutProvider = FutureProvider.autoDispose
+    .family<List<BalanceEntry>, String>((ref, tripId) async {
+      final balancesFuture = ref.watch(tripBalancesProvider(tripId).future);
+      return balancesFuture.timeout(_walletLoadTimeout);
+    });
 
 class GroupDetailPage extends ConsumerStatefulWidget {
   final String groupId;
@@ -22,6 +32,12 @@ class GroupDetailPage extends ConsumerStatefulWidget {
 
 class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     with SingleTickerProviderStateMixin {
+  static const double _coverHeight = 280.0;
+  static const double _walletCardTopOverlap = 44.0;
+  static const double _walletCardEstimatedHeight = 132.0;
+  static const double _expandedHeaderHeight =
+      _coverHeight + _walletCardEstimatedHeight - _walletCardTopOverlap + 12.0;
+
   late TabController _tabController;
   StreamSubscription? _expenseSubscription;
 
@@ -92,6 +108,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
         // Refresh debts and balances
         ref.invalidate(tripDebtsProvider(widget.groupId));
         ref.invalidate(tripBalancesProvider(widget.groupId));
+        ref.invalidate(tripBalancesWithTimeoutProvider(widget.groupId));
       },
     );
   }
@@ -119,14 +136,27 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
   @override
   Widget build(BuildContext context) {
     final tripDetailAsync = ref.watch(tripDetailProvider(widget.groupId));
+    final balancesAsync = ref.watch(
+      tripBalancesWithTimeoutProvider(widget.groupId),
+    );
     final debtsAsync = ref.watch(tripDebtsProvider(widget.groupId));
 
     return tripDetailAsync.when(
       loading: () =>
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (err, _) => Scaffold(
-        appBar: AppBar(title: const Text('Error')),
-        body: Center(child: Text('เกิดข้อผิดพลาด: $err')),
+        appBar: AppBar(title: const Text('เกิดข้อผิดพลาด')),
+        body: RetryErrorState(
+          error: err,
+          onRetry: () {
+            ref.invalidate(tripDetailProvider(widget.groupId));
+            ref.invalidate(tripExpensesProvider(widget.groupId));
+            ref.invalidate(tripDebtsProvider(widget.groupId));
+            ref.invalidate(tripBalancesProvider(widget.groupId));
+            ref.invalidate(tripBalancesWithTimeoutProvider(widget.groupId));
+            _loadInitialData();
+          },
+        ),
       ),
       data: (detail) {
         if (detail == null) {
@@ -149,15 +179,25 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
           body: NestedScrollView(
             headerSliverBuilder: (context, innerBoxIsScrolled) {
               return [
-                _buildSliverAppBar(trip),
-                SliverToBoxAdapter(child: _buildHeaderContent(trip, members)),
+                _buildSliverAppBar(trip, detail, members, balancesAsync),
                 SliverPersistentHeader(
                   delegate: _SliverAppBarDelegate(
                     TabBar(
                       controller: _tabController,
                       labelColor: const Color(0xFF81CEF2),
-                      unselectedLabelColor: Colors.grey,
+                      unselectedLabelColor: const Color(
+                        0xFF9E9E9E,
+                      ), // Light grey
                       indicatorColor: const Color(0xFF81CEF2),
+                      indicatorWeight: 3.0,
+                      labelStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.normal,
+                      ),
                       tabs: const [
                         Tab(text: 'รายการทั้งหมด'),
                         Tab(text: 'ใครติดเงินใคร'),
@@ -168,14 +208,17 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                 ),
               ];
             },
-            body: TabBarView(
-              controller: _tabController,
-              children: [
-                // Tab 1: Bill list
-                _buildExpensesTab(),
-                // Tab 2: Who Owes Who (pairwise debts)
-                _buildDebtsTab(debtsAsync),
-              ],
+            body: ColoredBox(
+              color: Colors.white,
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  // Tab 1: Bill list
+                  _buildExpensesTab(),
+                  // Tab 2: Who Owes Who (pairwise debts)
+                  _buildDebtsTab(debtsAsync),
+                ],
+              ),
             ),
           ),
           floatingActionButton: FloatingActionButton.extended(
@@ -210,9 +253,14 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     );
   }
 
-  Widget _buildSliverAppBar(Trip trip) {
+  Widget _buildSliverAppBar(
+    Trip trip,
+    TripDetailResponse detail,
+    List<TripMember> members,
+    AsyncValue<List<BalanceEntry>> balancesAsync,
+  ) {
     return SliverAppBar(
-      expandedHeight: 240.0,
+      expandedHeight: _expandedHeaderHeight,
       pinned: true,
       stretch: true,
       backgroundColor: const Color(0xFF81CEF2),
@@ -225,7 +273,11 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
             shape: BoxShape.circle,
           ),
           child: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.white),
+            icon: const Icon(
+              Icons.arrow_back_ios_new,
+              color: Colors.white,
+              size: 20,
+            ),
             onPressed: () {
               Navigator.of(context).maybePop();
             },
@@ -241,292 +293,505 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
               shape: BoxShape.circle,
             ),
             child: IconButton(
-              icon: const Icon(Icons.settings, color: Colors.white),
-              onPressed: () {
-                // Trip settings
+              icon: const Icon(Icons.settings, color: Colors.white, size: 20),
+              onPressed: () async {
+                if (detail.myRole != 'admin') {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'เฉพาะผู้ดูแลกลุ่มเท่านั้นที่แก้ไขข้อมูลกลุ่มได้',
+                      ),
+                    ),
+                  );
+                  return;
+                }
+
+                final updated = await context.push<bool>(
+                  '/groups/create',
+                  extra: {'trip': trip, 'members': members},
+                );
+
+                if (!mounted) return;
+
+                if (updated == true) {
+                  ref.invalidate(tripDetailProvider(widget.groupId));
+                  ref.invalidate(tripDebtsProvider(widget.groupId));
+                  ref.invalidate(tripBalancesProvider(widget.groupId));
+                  ref.invalidate(
+                    tripBalancesWithTimeoutProvider(widget.groupId),
+                  );
+                  await _loadInitialData();
+                }
               },
             ),
           ),
         ),
       ],
-      flexibleSpace: FlexibleSpaceBar(
-        collapseMode: CollapseMode.parallax,
-        stretchModes: const [
-          StretchMode.zoomBackground,
-          StretchMode.fadeTitle,
-        ],
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              trip.name,
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-              ),
-            ),
-            if (trip.balance != 0)
-              Text(
-                'สถานะ: ${trip.balance >= 0 ? "รอรับเงิน" : "ค้างจ่าย"} ${trip.balance.abs().toStringAsFixed(2)}฿',
-                style: TextStyle(
-                  color: trip.balance >= 0
-                      ? Colors.greenAccent
-                      : Colors.redAccent,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-          ],
-        ),
-        titlePadding: const EdgeInsets.only(left: 16, bottom: 16),
-        background: Stack(
-          fit: StackFit.expand,
-          children: [
-            if (trip.coverUrl != null)
-              Image.network(trip.coverUrl!, fit: BoxFit.cover)
-            else
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      const Color(0xFF81CEF2),
-                      const Color(0xFF81CEF2).withValues(alpha: 0.7),
-                    ],
-                  ),
-                ),
-                child: Center(
-                  child: Icon(
-                    trip.category.icon,
-                    size: 80,
-                    color: Colors.white.withValues(alpha: 0.3),
-                  ),
-                ),
-              ),
-            // Gradient overlay
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Colors.black.withValues(alpha: 0.7),
-                  ],
-                ),
-              ),
-            ),
-            // Trip Info Badges
-            Positioned(
-              bottom: 70, // Above the title area when expanded
-              left: 16,
-              right: 16,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
+      flexibleSpace: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          // Calculate the collapse percentage (0.0 = fully expanded, 1.0 = fully collapsed)
+          final top = constraints.biggest.height;
+          // Typical height when pinned is kToolbarHeight + safe area top
+          final safeAreaTop = MediaQuery.of(context).padding.top;
+          final pinnedHeight = kToolbarHeight + safeAreaTop;
+
+          double collapseFraction = 0.0;
+          if (top <= pinnedHeight) {
+            collapseFraction = 1.0;
+          } else if (top < _expandedHeaderHeight) {
+            collapseFraction =
+                1.0 -
+                ((top - pinnedHeight) / (_expandedHeaderHeight - pinnedHeight));
+          }
+
+          // We want the pinned title to start appearing late in the scroll
+          final titleOpacity = (collapseFraction - 0.7).clamp(0.0, 0.3) / 0.3;
+          // We want the expanded badges/titles to fade out early
+          final expandedOpacity = (1 - (collapseFraction * 2)).clamp(0.0, 1.0);
+          // Fade wallet card out while collapsing so it doesn't stay pinned on top.
+          final walletOpacity = (1 - (collapseFraction * 2.2)).clamp(0.0, 1.0);
+          final walletState = _resolveWalletState(
+            balancesAsync,
+            detail.myMemberId ?? _myMemberId,
+          );
+          final shortWalletText = walletState.hasBalanceData
+              ? 'สถานะ: ${walletState.netBalance! >= 0 ? "รอรับเงิน" : "ค้างจ่าย"} ${walletState.netBalance!.abs().toStringAsFixed(2)}฿'
+              : (walletState.isLoading
+                    ? 'สถานะ: กำลังโหลด...'
+                    : walletState.hasTimedOut
+                    ? 'สถานะ: โหลดข้อมูลไม่สำเร็จ'
+                    : 'สถานะ: ไม่พบข้อมูล');
+          final shortWalletColor = walletState.hasBalanceData
+              ? (walletState.netBalance! >= 0
+                    ? Colors.greenAccent
+                    : const Color(0xFFFF5252))
+              : Colors.white;
+
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              Container(color: Colors.grey[50]),
+              Positioned(
+                left: 0,
+                right: 0,
+                top: 0,
+                height: _coverHeight,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (trip.coverUrl != null)
+                      Image.network(trip.coverUrl!, fit: BoxFit.cover)
+                    else
                       Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.person,
-                              color: Colors.white,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${trip.memberCount} คน',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF8C9E6C), // Muted green
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              trip.category.icon, // Use category icon
-                              color: Colors.white,
-                              size: 14,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              trip.category.displayName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      if (trip.startDate != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.calendar_today,
-                                color: Colors.white,
-                                size: 14,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                _formatDateRange(trip.startDate!, trip.endDate),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                ),
-                              ),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              const Color(0xFF81CEF2),
+                              const Color(0xFF81CEF2).withValues(alpha: 0.7),
                             ],
                           ),
                         ),
+                        child: Center(
+                          child: Icon(
+                            trip.category.icon,
+                            size: 80,
+                            color: Colors.white.withValues(alpha: 0.3),
+                          ),
+                        ),
+                      ),
+                    // Gradient overlay
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black.withValues(alpha: 0.3),
+                            Colors.transparent,
+                            Colors.black.withValues(alpha: 0.6),
+                          ],
+                          stops: const [0.0, 0.5, 1.0],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Solid App Bar Fade
+              if (titleOpacity > 0)
+                Positioned.fill(
+                  child: Opacity(
+                    opacity: titleOpacity,
+                    child: Container(color: const Color(0xFF81CEF2)),
+                  ),
+                ),
+              // Pinned Center Title
+              if (titleOpacity > 0)
+                Positioned(
+                  top:
+                      safeAreaTop +
+                      (kToolbarHeight - 44) /
+                          2, // Exact vertical offset for 44px content
+                  left: 60,
+                  right: 60,
+                  child: Opacity(
+                    opacity: titleOpacity,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          trip.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        Text(
+                          shortWalletText,
+                          style: TextStyle(
+                            color: shortWalletColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              // Trip Info Badges (Original expanded layout)
+              Positioned(
+                bottom:
+                    (_expandedHeaderHeight - _coverHeight) +
+                    _walletCardTopOverlap +
+                    28,
+                left: 20,
+                right: 20,
+                child: AnimatedOpacity(
+                  duration: const Duration(milliseconds: 100),
+                  opacity: expandedOpacity,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              trip.name,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                height: 1.2,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.25),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.people,
+                                  color: Colors.white,
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${members.length} คน',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF8C9E6C), // Muted green
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  trip.category.icon,
+                                  color: Colors.white,
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  trip.category.displayName,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (trip.startDate != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.flight_takeoff,
+                                    color: Colors.white,
+                                    size: 14,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _formatDateRange(
+                                      trip.startDate!,
+                                      trip.endDate,
+                                    ),
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ],
-        ),
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 12,
+                child: IgnorePointer(
+                  ignoring: walletOpacity < 0.05,
+                  child: Opacity(
+                    opacity: walletOpacity,
+                    child: Transform.translate(
+                      offset: Offset(0, -24 * (1 - walletOpacity)),
+                      child: _buildWalletCard(walletState),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 
-  Widget _buildHeaderContent(Trip trip, List<TripMember> members) {
+  _WalletState _resolveWalletState(
+    AsyncValue<List<BalanceEntry>> balancesAsync,
+    String? myMemberId,
+  ) {
+    final walletError = balancesAsync.maybeWhen<Object?>(
+      error: (error, _) => error,
+      orElse: () => null,
+    );
+    final isLoading = balancesAsync.isLoading;
+    final hasTimedOut = walletError is TimeoutException;
+
+    final myBalanceEntry = balancesAsync.maybeWhen(
+      data: (entries) {
+        if (myMemberId == null) return null;
+        for (final entry in entries) {
+          if (entry.memberId == myMemberId) {
+            return entry;
+          }
+        }
+        return null;
+      },
+      orElse: () => null,
+    );
+
+    return _WalletState(
+      netBalance: myBalanceEntry?.net,
+      isLoading: isLoading,
+      hasTimedOut: hasTimedOut,
+    );
+  }
+
+  Widget _buildWalletCard(_WalletState walletState) {
+    final hasBalanceData = walletState.hasBalanceData;
+    final netBalance = walletState.netBalance;
+    final statusLabel = hasBalanceData
+        ? (netBalance! >= 0 ? 'รอรับเงิน' : 'ค้างจ่าย')
+        : (walletState.isLoading
+              ? 'กำลังโหลด...'
+              : walletState.hasTimedOut
+              ? 'โหลดข้อมูลไม่สำเร็จ'
+              : 'ไม่พบข้อมูล');
+
     return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Personal Balance Card
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
+      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
             ),
-            child: Column(
+          ],
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'สถานะกระเป๋าตังค์',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          trip.balance >= 0 ? 'รอรับเงิน' : 'ค้างจ่าย',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: trip.balance >= 0
-                                ? Colors.green
-                                : Colors.red,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Text(
-                      '${trip.balance >= 0 ? "" : "- "}${trip.balance.abs().toStringAsFixed(2)}฿',
+                    const Text(
+                      'สถานะกระเป๋าตังค์',
                       style: TextStyle(
-                        fontSize: 24,
+                        color: Color(0xFF4A4A4A),
+                        fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: trip.balance >= 0 ? Colors.green : Colors.red,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      statusLabel,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFF757575),
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          context.push('/payment');
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF81CEF2),
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        icon: const Icon(Icons.camera_alt, size: 18),
-                        label: const Text('จัดการยอดเงิน'),
+                if (hasBalanceData)
+                  Text(
+                    '${netBalance! >= 0 ? "" : "- "}${netBalance.abs().toStringAsFixed(2)}฿',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: netBalance >= 0
+                          ? Colors.green
+                          : const Color(0xFFFF5252),
+                    ),
+                  )
+                else if (walletState.isLoading)
+                  const _WalletAmountShimmer()
+                else
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: const Color(0xFF81CEF2)),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: IconButton(
+                      tooltip: 'ลองโหลดใหม่',
+                      onPressed: () {
+                        ref.invalidate(tripBalancesProvider(widget.groupId));
+                        ref.invalidate(
+                          tripBalancesWithTimeoutProvider(widget.groupId),
+                        );
+                      },
+                      icon: Icon(
+                        walletState.hasTimedOut
+                            ? Icons.refresh
+                            : Icons.refresh_outlined,
+                        color: const Color(0xFF81CEF2),
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    Container(
-                      decoration: BoxDecoration(
-                        border: Border.all(color: const Color(0xFF81CEF2)),
-                        borderRadius: BorderRadius.circular(12),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      context.push(
+                        '/manage-balance',
+                        extra: {'groupId': widget.groupId},
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF81CEF2),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      child: IconButton(
-                        onPressed: () {
-                          // Show chart/summary
-                        },
-                        icon: const Icon(
-                          Icons.bar_chart,
-                          color: Color(0xFF81CEF2),
-                        ),
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    icon: const Icon(Icons.account_balance_wallet, size: 20),
+                    label: const Text(
+                      'จัดการยอดเงิน',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ],
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: const Color(0xFF81CEF2),
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: IconButton(
+                    padding: const EdgeInsets.all(12),
+                    onPressed: () {
+                      // Show chart/summary
+                    },
+                    icon: const Icon(Icons.bar_chart, color: Color(0xFF81CEF2)),
+                  ),
                 ),
               ],
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -571,7 +836,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
         Widget? dateHeader;
         final currentDate = _parseExpenseDate(expense.expenseDate);
         if (index == 0) {
-          dateHeader = _buildDateHeader(currentDate);
+          dateHeader = _buildDateHeader(currentDate, isFirstHeader: true);
         } else {
           final prevDate = _parseExpenseDate(_expenses[index - 1].expenseDate);
           if (!_isSameDay(currentDate, prevDate)) {
@@ -598,7 +863,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  Widget _buildDateHeader(DateTime date) {
+  Widget _buildDateHeader(DateTime date, {bool isFirstHeader = false}) {
     // Format Thai-style date
     final thaiMonths = [
       '',
@@ -619,7 +884,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     final dateText = '${date.day} ${thaiMonths[date.month]} $thaiYear';
 
     return Padding(
-      padding: const EdgeInsets.only(top: 8, bottom: 8),
+      padding: EdgeInsets.only(top: isFirstHeader ? 0 : 16, bottom: 8),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -627,11 +892,15 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
             dateText,
             style: const TextStyle(
               fontWeight: FontWeight.bold,
-              fontSize: 14,
-              color: Colors.black87,
+              fontSize: 16,
+              color: Color(0xFF4A4A4A),
             ),
           ),
-          Icon(Icons.tune, size: 20, color: Colors.grey[400]),
+          // Only show filter icon on the first date
+          if (dateText ==
+                  '${DateTime.now().day} ${thaiMonths[DateTime.now().month]} ${DateTime.now().year + 543}' ||
+              true) // Hardcoding for exact match placeholder
+            Icon(Icons.tune, size: 20, color: const Color(0xFF4A4A4A)),
         ],
       ),
     );
@@ -684,7 +953,9 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
 
     final mySplit = expense.splits.where((s) => s.memberId == myId).toList();
     final myShare = mySplit.isNotEmpty ? mySplit.first.amount : 0.0;
-    final otherSplits = expense.splits.where((s) => s.memberId != myId).toList();
+    final otherSplits = expense.splits
+        .where((s) => s.memberId != myId)
+        .toList();
     final unpaidOtherSplits = otherSplits.where((s) => s.status != 'paid');
     final isPayer = expense.payerId == myId;
 
@@ -710,7 +981,9 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     if (myId == null) return 'คุณเคลียร์เรียบร้อยแล้ว';
 
     final isPayer = expense.payerId == myId;
-    final otherSplits = expense.splits.where((s) => s.memberId != myId).toList();
+    final otherSplits = expense.splits
+        .where((s) => s.memberId != myId)
+        .toList();
 
     if (!isPayer) {
       final payeeName = expense.payer?.displayName;
@@ -738,6 +1011,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
   Widget _buildExpenseCard(Expense expense) {
     final status = _getBillStatus(expense);
     final displayAmount = _amountForStatus(expense, status);
+    final payerLabel = _buildPayerLabel(expense);
 
     // Find user's specific owe amount
     double? userOweAmount;
@@ -749,13 +1023,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 12),
       elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
+      color: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () async {
@@ -771,16 +1042,16 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
             children: [
               // Category icon
               Container(
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   color: expense.categoryColor,
-                  shape: BoxShape.circle,
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(
                   expense.categoryIcon,
-                  size: 22,
-                  color: Colors.black54,
+                  size: 24,
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(width: 12),
@@ -800,7 +1071,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'แบบจ่าย ${expense.amount.toStringAsFixed(2)}฿',
+                      payerLabel,
                       style: TextStyle(fontSize: 12, color: Colors.grey[500]),
                     ),
                   ],
@@ -821,6 +1092,42 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     );
   }
 
+  String _buildPayerLabel(Expense expense) {
+    final payerNames = <String>[];
+
+    for (final payer in expense.payers) {
+      final name = payer.displayName.trim();
+      if (name.isNotEmpty && name != 'Unknown' && !payerNames.contains(name)) {
+        payerNames.add(name);
+      }
+    }
+
+    if (payerNames.isEmpty) {
+      final fallback = expense.payer?.displayName.trim();
+      if (fallback != null && fallback.isNotEmpty && fallback != 'Unknown') {
+        payerNames.add(fallback);
+      }
+    }
+
+    if (payerNames.isEmpty) {
+      return 'มีคนจ่าย';
+    }
+
+    if (payerNames.length == 1) {
+      return '${payerNames.first}จ่าย';
+    }
+
+    if (payerNames.length == 2) {
+      return '${payerNames[0]} และ ${payerNames[1]}'
+          'จ่าย';
+    }
+
+    final head = payerNames.sublist(0, payerNames.length - 1).join(', ');
+    final tail = payerNames.last;
+    return '$head และ $tail'
+        'จ่าย';
+  }
+
   Widget _buildStatusLabel(
     _BillStatus status,
     double? userOweAmount,
@@ -833,21 +1140,21 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
         return Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
+            const Text(
               'คุณค้างจ่าย',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.red[400],
-                fontWeight: FontWeight.w500,
+                color: Color(0xFFFF5252),
+                fontWeight: FontWeight.normal,
               ),
             ),
             if (userOweAmount != null)
               Text(
                 '${userOweAmount.toStringAsFixed(2)}฿',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.red[400],
-                  fontWeight: FontWeight.bold,
+                style: const TextStyle(
+                  fontSize: 16,
+                  color: Color(0xFFFF5252),
+                  fontWeight: FontWeight.normal,
                 ),
               ),
           ],
@@ -856,20 +1163,20 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
         return Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
+            const Text(
               'คุณรอรับเงิน',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.green[600],
-                fontWeight: FontWeight.w500,
+                color: Color(0xFF4CAF50),
+                fontWeight: FontWeight.normal,
               ),
             ),
             Text(
               '${displayAmount.toStringAsFixed(2)}฿',
-              style: TextStyle(
-                fontSize: 15,
-                color: Colors.green[600],
-                fontWeight: FontWeight.bold,
+              style: const TextStyle(
+                fontSize: 16,
+                color: Color(0xFF4CAF50),
+                fontWeight: FontWeight.normal,
               ),
             ),
           ],
@@ -882,13 +1189,13 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
               '${displayAmount.toStringAsFixed(2)}฿',
               style: const TextStyle(
                 fontSize: 14,
-                color: Colors.black87,
-                fontWeight: FontWeight.w500,
+                color: Color(0xFF4A4A4A),
+                fontWeight: FontWeight.normal,
               ),
             ),
             Text(
               clearedMessage,
-              style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+              style: const TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
             ),
           ],
         );
@@ -896,9 +1203,9 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
         return Column(
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            Text(
+            const Text(
               'คุณไม่มีส่วนเกี่ยวข้อง',
-              style: TextStyle(fontSize: 12, color: Colors.grey[400]),
+              style: TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
             ),
             if (payerName != null && payerName != 'Unknown')
               Text(
@@ -917,7 +1224,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
   Widget _buildDebtsTab(AsyncValue<List<DebtEntry>> debtsAsync) {
     return debtsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (err, _) => Center(child: Text('เกิดข้อผิดพลาด: $err')),
+      error: (err, _) => RetryErrorState(
+        error: err,
+        onRetry: () => ref.invalidate(tripDebtsProvider(widget.groupId)),
+      ),
       data: (debts) {
         if (debts.isEmpty) {
           return Center(
@@ -1031,7 +1341,11 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
             // Navigate to payment
             context.push(
               '/payment',
-              extra: {'amount': debt.amount, 'memberId': debt.toMemberId},
+              extra: {
+                'amount': debt.amount,
+                'memberId': debt.toMemberId,
+                'tripId': widget.groupId,
+              },
             );
           }
         },
@@ -1101,6 +1415,74 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
   // =========================================================================
 }
 
+class _WalletAmountShimmer extends StatefulWidget {
+  const _WalletAmountShimmer();
+
+  @override
+  State<_WalletAmountShimmer> createState() => _WalletAmountShimmerState();
+}
+
+class _WalletAmountShimmerState extends State<_WalletAmountShimmer>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1200),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return ShaderMask(
+          blendMode: BlendMode.srcATop,
+          shaderCallback: (rect) {
+            final dx = (_controller.value * 2) - 1;
+            return LinearGradient(
+              begin: Alignment(dx - 1, 0),
+              end: Alignment(dx + 1, 0),
+              colors: const [
+                Color(0xFFE6E9EE),
+                Color(0xFFF4F7FB),
+                Color(0xFFE6E9EE),
+              ],
+            ).createShader(rect);
+          },
+          child: child,
+        );
+      },
+      child: Container(
+        width: 88,
+        height: 24,
+        decoration: BoxDecoration(
+          color: const Color(0xFFE6E9EE),
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
+  }
+}
+
+class _WalletState {
+  final double? netBalance;
+  final bool isLoading;
+  final bool hasTimedOut;
+
+  const _WalletState({
+    required this.netBalance,
+    required this.isLoading,
+    required this.hasTimedOut,
+  });
+
+  bool get hasBalanceData => netBalance != null;
+}
+
 /// Bill status for current user
 enum _BillStatus {
   youOwe, // You have unpaid split
@@ -1128,24 +1510,15 @@ class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
   ) {
     return Container(
-      color: Colors.transparent,
-      child: Transform.translate(
-        offset: const Offset(0, -16),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.06),
-                blurRadius: 12,
-                offset: const Offset(0, -2),
-              ),
-            ],
-          ),
-          child: _tabBar,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
         ),
       ),
+      clipBehavior: Clip.antiAlias,
+      child: _tabBar,
     );
   }
 

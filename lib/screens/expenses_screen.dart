@@ -1,45 +1,51 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nubbill/services/auth_repository.dart';
 import 'package:nubbill/services/trip_service.dart';
 import 'package:nubbill/services/expense_service.dart';
+import 'package:nubbill/widgets/retry_error_state.dart';
 
 /// Provider for all user expenses across all trips
-final allExpensesProvider = FutureProvider<List<Map<String, dynamic>>>((
-  ref,
-) async {
-  final tripService = ref.read(tripServiceProvider);
-  final expenseService = ref.read(expenseServiceProvider);
+final allExpensesProvider =
+    FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
+      final userId = ref.watch(authUserIdProvider);
+      if (userId == null) return [];
 
-  // Get all trips
-  final trips = await tripService.getTrips();
+      final tripService = ref.read(tripServiceProvider);
+      final expenseService = ref.read(expenseServiceProvider);
 
-  // Fetch expenses for each trip
-  final allExpenses = <Map<String, dynamic>>[];
-  for (final trip in trips) {
-    try {
-      final expenses = await expenseService.getTripExpenses(trip.id);
-      for (final expense in expenses) {
-        // Add trip info to expense
-        final expenseMap = expense as Map<String, dynamic>;
-        expenseMap['trip_name'] = trip.name;
-        expenseMap['trip_id'] = trip.id;
-        allExpenses.add(expenseMap);
+      // Get all trips
+      final trips = await tripService.getTrips();
+
+      // Fetch expenses for each trip
+      final allExpenses = <Map<String, dynamic>>[];
+      for (final trip in trips) {
+        try {
+          final expenses = await expenseService.getTripExpenses(trip.id);
+          for (final expense in expenses) {
+            // Add trip info to expense
+            final expenseMap = expense as Map<String, dynamic>;
+            expenseMap['trip_name'] = trip.name;
+            expenseMap['trip_id'] = trip.id;
+            allExpenses.add(expenseMap);
+          }
+        } catch (e) {
+          // Skip trips with errors
+        }
       }
-    } catch (e) {
-      // Skip trips with errors
-    }
-  }
 
-  // Sort by date (newest first)
-  allExpenses.sort((a, b) {
-    final dateA = DateTime.tryParse(a['expense_date'] ?? '') ?? DateTime(2000);
-    final dateB = DateTime.tryParse(b['expense_date'] ?? '') ?? DateTime(2000);
-    return dateB.compareTo(dateA);
-  });
+      // Sort by date (newest first)
+      allExpenses.sort((a, b) {
+        final dateA =
+            DateTime.tryParse(a['expense_date'] ?? '') ?? DateTime(2000);
+        final dateB =
+            DateTime.tryParse(b['expense_date'] ?? '') ?? DateTime(2000);
+        return dateB.compareTo(dateA);
+      });
 
-  return allExpenses;
-});
+      return allExpenses;
+    });
 
 class ExpensesScreen extends ConsumerWidget {
   const ExpensesScreen({super.key});
@@ -61,20 +67,9 @@ class ExpensesScreen extends ConsumerWidget {
       ),
       body: expensesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (err, _) => Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
-              const SizedBox(height: 16),
-              Text('เกิดข้อผิดพลาด: $err'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref.invalidate(allExpensesProvider),
-                child: const Text('ลองอีกครั้ง'),
-              ),
-            ],
-          ),
+        error: (err, _) => RetryErrorState(
+          error: err,
+          onRetry: () => ref.invalidate(allExpensesProvider),
         ),
         data: (expenses) {
           if (expenses.isEmpty) {

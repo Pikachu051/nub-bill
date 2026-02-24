@@ -5,26 +5,111 @@ import 'package:nubbill/services/auth_repository.dart';
 import 'package:nubbill/services/profile_service.dart';
 import 'package:nubbill/models/trip_model.dart';
 import 'package:nubbill/config/supabase_config.dart';
+import 'package:nubbill/widgets/retry_error_state.dart';
 
 /// Provider for user's groups directly from Supabase
-final userTripsProvider = FutureProvider<List<Trip>>((ref) async {
-  final userId = SupabaseConfig.currentUser?.id;
+final userTripsProvider = FutureProvider.autoDispose<List<Trip>>((ref) async {
+  final userId = ref.watch(authUserIdProvider);
   if (userId == null) return [];
 
   try {
     // Get trips where user is a member
     final response = await SupabaseConfig.client
         .from('trip_members')
-        .select('trip:trips(*)')
+        .select('id, trip_id, role, trip:trips(*)')
         .eq('user_id', userId);
 
     final trips = <Trip>[];
+    final memberIdToTripId = <String, String>{};
+    final tripBalances = <String, double>{};
+
     for (final item in response as List) {
       if (item['trip'] != null) {
-        trips.add(Trip.fromJson(item['trip'] as Map<String, dynamic>));
+        final trip = Trip.fromJson(item['trip'] as Map<String, dynamic>);
+        trips.add(trip);
+
+        final memberId = item['id'] as String?;
+        if (memberId != null) {
+          memberIdToTripId[memberId] = trip.id;
+          tripBalances[trip.id] = 0;
+        }
       }
     }
-    return trips;
+
+    final myMemberIds = memberIdToTripId.keys.toList();
+    if (myMemberIds.isEmpty) return trips;
+
+    // Sum what current user still owes per trip (status != paid)
+    try {
+      final owedSplits = await SupabaseConfig.client
+          .from('expense_splits')
+          .select('member_id, amount')
+          .inFilter('member_id', myMemberIds)
+          .neq('status', 'paid');
+
+      for (final split in owedSplits as List) {
+        final memberId = split['member_id'] as String?;
+        final amount = (split['amount'] as num?)?.toDouble() ?? 0;
+        final tripId = memberId == null ? null : memberIdToTripId[memberId];
+        if (tripId != null) {
+          tripBalances[tripId] = (tripBalances[tripId] ?? 0) - amount;
+        }
+      }
+    } catch (e) {
+      debugPrint('Trips - failed to load owed splits: $e');
+    }
+
+    // Sum what others still owe current user per trip (expenses where user is payer)
+    try {
+      final receivableExpenses = await SupabaseConfig.client
+          .from('expenses')
+          .select(
+            'trip_id, payer_id, expense_splits(member_id, amount, status)',
+          )
+          .inFilter('payer_id', myMemberIds);
+
+      for (final expense in receivableExpenses as List) {
+        final tripId = expense['trip_id'] as String?;
+        final payerId = expense['payer_id'] as String?;
+        if (tripId == null || payerId == null) continue;
+
+        final splits = expense['expense_splits'] as List? ?? [];
+        for (final split in splits) {
+          final status = split['status'] as String?;
+          final debtorMemberId = split['member_id'] as String?;
+          if (status == 'paid' ||
+              debtorMemberId == null ||
+              debtorMemberId == payerId) {
+            continue;
+          }
+
+          final amount = (split['amount'] as num?)?.toDouble() ?? 0;
+          tripBalances[tripId] = (tripBalances[tripId] ?? 0) + amount;
+        }
+      }
+    } catch (e) {
+      debugPrint('Trips - failed to load receivable splits: $e');
+    }
+
+    return trips
+        .map(
+          (trip) => Trip(
+            id: trip.id,
+            name: trip.name,
+            category: trip.category,
+            joinCode: trip.joinCode,
+            coverUrl: trip.coverUrl,
+            startDate: trip.startDate,
+            endDate: trip.endDate,
+            createdBy: trip.createdBy,
+            createdAt: trip.createdAt,
+            updatedAt: trip.updatedAt,
+            balance: tripBalances[trip.id] ?? 0,
+            memberCount: trip.memberCount,
+            myRole: trip.myRole,
+          ),
+        )
+        .toList();
   } catch (e) {
     debugPrint('Failed to load trips: $e');
     rethrow; // Let AsyncValue.error handle it gracefully
@@ -32,9 +117,11 @@ final userTripsProvider = FutureProvider<List<Trip>>((ref) async {
 });
 
 /// Provider for wallet summary (total owed to user & user owes)
-final walletSummaryProvider = FutureProvider<Map<String, double>>((ref) async {
+final walletSummaryProvider = FutureProvider.autoDispose<Map<String, double>>((
+  ref,
+) async {
   try {
-    final userId = SupabaseConfig.currentUser?.id;
+    final userId = ref.watch(authUserIdProvider);
     if (userId == null) return {'toReceive': 0.0, 'toPay': 0.0};
 
     // Get member IDs for this user
@@ -108,12 +195,13 @@ class HomePage extends ConsumerWidget {
       data: (profile) =>
           profile.nickname ?? user?.userMetadata?['nickname'] ?? 'User',
       loading: () => user?.userMetadata?['nickname'] ?? 'User',
-      error: (_, __) => user?.userMetadata?['nickname'] ?? 'User',
+      error: (error, stackTrace) => user?.userMetadata?['nickname'] ?? 'User',
     );
     final avatarUrl = profileAsync.when(
       data: (profile) => profile.avatarUrl,
       loading: () => user?.userMetadata?['avatar_url'] as String?,
-      error: (_, __) => user?.userMetadata?['avatar_url'] as String?,
+      error: (error, stackTrace) =>
+          user?.userMetadata?['avatar_url'] as String?,
     );
 
     final tripsAsync = ref.watch(userTripsProvider);
@@ -232,7 +320,7 @@ class HomePage extends ConsumerWidget {
                     const SizedBox(height: 12),
 
                     // Groups List
-                    _buildGroupsList(context, tripsAsync),
+                    _buildGroupsList(context, ref, tripsAsync),
 
                     // Bottom padding for FAB
                     const SizedBox(height: 80),
@@ -276,7 +364,7 @@ class HomePage extends ConsumerWidget {
     );
   }
 
-//Wallet widget
+  //Wallet widget
   Widget _buildWalletCard(AsyncValue<Map<String, double>> walletAsync) {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -285,7 +373,7 @@ class HomePage extends ConsumerWidget {
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -298,7 +386,7 @@ class HomePage extends ConsumerWidget {
             child: CircularProgressIndicator(),
           ),
         ),
-        error: (_, __) => const Text('ไม่สามารถโหลดข้อมูลได้'),
+        error: (error, stackTrace) => const Text('ไม่สามารถโหลดข้อมูลได้'),
         data: (wallet) {
           final toReceive = wallet['toReceive'] ?? 0;
           final toPay = wallet['toPay'] ?? 0;
@@ -425,6 +513,7 @@ class HomePage extends ConsumerWidget {
 
   Widget _buildGroupsList(
     BuildContext context,
+    WidgetRef ref,
     AsyncValue<List<Trip>> tripsAsync,
   ) {
     return tripsAsync.when(
@@ -434,28 +523,10 @@ class HomePage extends ConsumerWidget {
           child: CircularProgressIndicator(),
         ),
       ),
-      error: (err, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(40),
-          child: Column(
-            children: [
-              const Icon(Icons.wifi_off, size: 48, color: Colors.grey),
-              const SizedBox(height: 12),
-              Text(
-                'ไม่สามารถเชื่อมต่อได้',
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่',
-                style: TextStyle(color: Colors.grey[500], fontSize: 14),
-              ),
-            ],
-          ),
+      error: (err, stackTrace) => Center(
+        child: RetryErrorState(
+          error: err,
+          onRetry: () => ref.invalidate(userTripsProvider),
         ),
       ),
       data: (trips) {
@@ -492,6 +563,16 @@ class HomePage extends ConsumerWidget {
   }
 
   Widget _buildGroupCard(BuildContext context, Trip trip) {
+    final balance = trip.balance;
+    final isPositive = balance > 0;
+    final isNegative = balance < 0;
+    final statusLabel = isPositive
+        ? 'รอรับเงิน'
+        : (isNegative ? 'ค้างจ่าย' : 'เคลียร์');
+    final amountColor = isPositive
+        ? const Color(0xFF81CEF2)
+        : (isNegative ? Colors.red[400] : Colors.grey[500]);
+
     return Card(
       elevation: 0,
       color: Colors.white,
@@ -501,7 +582,7 @@ class HomePage extends ConsumerWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
           radius: 24,
-          backgroundColor: const Color(0xFF81CEF2).withOpacity(0.1),
+          backgroundColor: const Color(0xFF81CEF2).withValues(alpha: 0.1),
           backgroundImage: trip.coverUrl != null
               ? NetworkImage(trip.coverUrl!)
               : null,
@@ -519,14 +600,14 @@ class HomePage extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.end,
           children: [
             Text(
-              'ค้างจ่าย',
+              statusLabel,
               style: TextStyle(color: Colors.grey[500], fontSize: 12),
             ),
             const SizedBox(height: 2),
             Text(
-              '0.00฿', // TODO: Calculate from expense_splits
+              '${_formatMoney(balance.abs())}฿',
               style: TextStyle(
-                color: Colors.red[400],
+                color: amountColor,
                 fontWeight: FontWeight.bold,
                 fontSize: 14,
               ),
