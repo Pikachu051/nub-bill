@@ -11,6 +11,7 @@ import 'package:nubbill/models/expense_model.dart';
 import 'package:nubbill/models/debt_entry_model.dart';
 import 'package:nubbill/models/balance_entry_model.dart';
 import 'package:nubbill/config/supabase_config.dart';
+import 'package:nubbill/widgets/half_width_tab_indicator.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
 
 const _walletLoadTimeout = Duration(seconds: 5);
@@ -188,8 +189,13 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                       unselectedLabelColor: const Color(
                         0xFF9E9E9E,
                       ), // Light grey
-                      indicatorColor: const Color(0xFF81CEF2),
-                      indicatorWeight: 3.0,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicator: const HalfWidthTabIndicator(
+                        color: Color(0xFF81CEF2),
+                        thickness: 3,
+                        widthFactor: 0.5,
+                        radius: 2,
+                      ),
                       labelStyle: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,

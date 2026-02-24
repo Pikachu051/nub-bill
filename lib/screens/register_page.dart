@@ -101,213 +101,204 @@ class _RegisterPageState extends State<RegisterPage> {
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'ยินดีต้อนรับ! ผมนับบิล',
-                style: TextStyle(
-                  color: Color.fromARGB(255, 129, 206, 242),
-                  fontWeight: FontWeight.bold,
-                  fontSize: 24,
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text.rich(
-                TextSpan(
-                  text: 'สมัครสมาชิกเพื่อให้เราช่วยดูแล',
-                  style: const TextStyle(fontSize: 14),
-                  children: [
-                    TextSpan(
-                      text: 'เรื่องตัวเลขในทุกมื้อ',
-                      style: TextStyle(
-                        color: const Color.fromARGB(255, 129, 206, 242),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const Text('คุณแค่เที่ยว เรื่องหารบิลเราจัดการเอง!'),
-              const SizedBox(height: 40),
-              Form(
-                key: _formKey,
-                child: Column(
-                  children: [
-                    // Email
-                    TextFormField(
-                      controller: _emailController,
-                      keyboardType: TextInputType.emailAddress,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'กรุณากรอกอีเมล';
-                        }
-                        if (!value.contains('@')) {
-                          return 'กรุณากรอกอีเมลให้ถูกต้อง';
-                        }
-                        return null;
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'กรอกอีเมล',
-                        hintStyle: const TextStyle(color: Colors.grey),
-                        filled: true,
-                        fillColor: const Color(0x1414161A),
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 20,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: const BorderSide(
-                            color: Color.fromARGB(255, 129, 206, 242),
-                            width: 2,
-                          ),
-                        ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: const BorderSide(
-                            color: Colors.red,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Nickname
-                    TextFormField(
-                      controller: _nicknameController,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'กรุณากรอกชื่อเล่น';
-                        }
-                        return null;
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'กรอกชื่อเล่น',
-                        hintStyle: const TextStyle(color: Colors.grey),
-                        filled: true,
-                        fillColor: const Color(0x1414161A),
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 20,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: const BorderSide(
-                            color: Color.fromARGB(255, 129, 206, 242),
-                            width: 2,
-                          ),
-                        ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: const BorderSide(
-                            color: Colors.red,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Password
-                    TextFormField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return 'กรุณากรอกรหัสผ่าน';
-                        }
-                        if (value.length < 6) {
-                          return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
-                        }
-                        return null;
-                      },
-                      decoration: InputDecoration(
-                        hintText: 'รหัสผ่าน',
-                        hintStyle: const TextStyle(color: Colors.grey),
-                        filled: true,
-                        fillColor: const Color(0x1414161A),
-                        contentPadding: const EdgeInsets.symmetric(
-                          vertical: 16,
-                          horizontal: 20,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: BorderSide.none,
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: const BorderSide(
-                            color: Color.fromARGB(255, 129, 206, 242),
-                            width: 2,
-                          ),
-                        ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30),
-                          borderSide: const BorderSide(
-                            color: Colors.red,
-                            width: 2,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 40),
-
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  _isLoading
-                      ? const CircularProgressIndicator(
-                          color: Color.fromARGB(255, 129, 206, 242),
-                        )
-                      : RoundedButton(
-                          text: 'รับรหัสยืนยันทางอีเมล',
-                          backgroundColor: const Color.fromARGB(
-                            255,
-                            129,
-                            206,
-                            242,
-                          ),
-                          textColor: Colors.white,
-                          onPressed: _signUp,
-                        ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text("มีบัญชีอยู่แล้ว?"),
-                  const SizedBox(width: 5),
-                  GestureDetector(
-                    onTap: () => context.push('/login'),
-                    child: const Text(
-                      'ลงชื่อเข้าใช้',
-                      style: TextStyle(
-                        color: Color.fromARGB(255, 129, 206, 242),
-                      ),
-                    ),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'ยินดีต้อนรับ! ผมนับบิล',
+                  style: TextStyle(
+                    color: Color.fromARGB(255, 129, 206, 242),
+                    fontWeight: FontWeight.bold,
+                    fontSize: 24,
                   ),
-                ],
-              ),
-            ],
+                ),
+                const SizedBox(height: 16),
+                Text.rich(
+                  TextSpan(
+                    text: 'สมัครสมาชิกเพื่อให้เราช่วยดูแล',
+                    style: const TextStyle(fontSize: 14),
+                    children: [
+                      TextSpan(
+                        text: 'เรื่องตัวเลขในทุกมื้อ',
+                        style: TextStyle(
+                          color: const Color.fromARGB(255, 129, 206, 242),
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Text('คุณแค่เที่ยว เรื่องหารบิลเราจัดการเอง!'),
+                const SizedBox(height: 40),
+                Form(
+                  key: _formKey,
+                  child: Column(
+                    children: [
+                      // Email
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'กรุณากรอกอีเมล';
+                          }
+                          if (!value.contains('@')) {
+                            return 'กรุณากรอกอีเมลให้ถูกต้อง';
+                          }
+                          return null;
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'กรอกอีเมล',
+                          hintStyle: const TextStyle(color: Colors.grey),
+                          filled: true,
+                          fillColor: const Color(0x1414161A),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 20,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: BorderSide.none,
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: const BorderSide(
+                              color: Colors.red,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Nickname
+                      TextFormField(
+                        controller: _nicknameController,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'กรุณากรอกชื่อเล่น';
+                          }
+                          return null;
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'กรอกชื่อเล่น',
+                          hintStyle: const TextStyle(color: Colors.grey),
+                          filled: true,
+                          fillColor: const Color(0x1414161A),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 20,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: BorderSide.none,
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: const BorderSide(
+                              color: Colors.red,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 16),
+
+                      // Password
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: true,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'กรุณากรอกรหัสผ่าน';
+                          }
+                          if (value.length < 6) {
+                            return 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+                          }
+                          return null;
+                        },
+                        decoration: InputDecoration(
+                          hintText: 'รหัสผ่าน',
+                          hintStyle: const TextStyle(color: Colors.grey),
+                          filled: true,
+                          fillColor: const Color(0x1414161A),
+                          contentPadding: const EdgeInsets.symmetric(
+                            vertical: 16,
+                            horizontal: 20,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: BorderSide.none,
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: BorderSide.none,
+                          ),
+                          errorBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(30),
+                            borderSide: const BorderSide(
+                              color: Colors.red,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _isLoading
+                        ? const CircularProgressIndicator(
+                            color: Color.fromARGB(255, 129, 206, 242),
+                          )
+                        : RoundedButton(
+                            text: 'รับรหัสยืนยันทางอีเมล',
+                            backgroundColor: const Color.fromARGB(
+                              255,
+                              129,
+                              206,
+                              242,
+                            ),
+                            textColor: Colors.white,
+                            onPressed: _signUp,
+                          ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Text("มีบัญชีอยู่แล้ว?"),
+                    const SizedBox(width: 5),
+                    GestureDetector(
+                      onTap: () => context.push('/login'),
+                      child: const Text(
+                        'ลงชื่อเข้าใช้',
+                        style: TextStyle(
+                          color: Color.fromARGB(255, 129, 206, 242),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
         ),
       ),
     );

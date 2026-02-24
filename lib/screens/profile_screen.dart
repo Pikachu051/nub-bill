@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nubbill/services/auth_repository.dart';
 import 'package:nubbill/services/profile_service.dart';
@@ -17,6 +18,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   bool _isUploadingAvatar = false;
+  bool _hasQueuedPaymentAutoNav = false;
 
   Future<void> _pickAndUploadAvatar() async {
     final picker = ImagePicker();
@@ -138,6 +140,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     WidgetRef ref,
     UserProfile profile,
   ) {
+    _maybeAutoNavigatePaymentMethods(profile);
     final nickname = profile.nickname ?? 'ผู้ใช้งาน';
 
     return RefreshIndicator(
@@ -235,6 +238,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
 
             const SizedBox(height: 32),
+            if (profile.primaryPaymentMethod == null)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: _buildPaymentMethodPrompt(context),
+              ),
+            if (profile.primaryPaymentMethod == null)
+              const SizedBox(height: 24),
             const Divider(thickness: 8, color: Color(0xFFF5F5F5)),
 
             _buildSettingsList(context, ref),
@@ -320,7 +330,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         _buildSettingItem(
           icon: Icons.credit_card,
           title: 'จัดการบัญชี / พร้อมเพย์',
-          onTap: () {},
+          onTap: () => context.push('/payment-methods'),
         ),
 
         const Divider(),
@@ -365,6 +375,68 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ),
       ],
     );
+  }
+
+  Widget _buildPaymentMethodPrompt(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF5FB),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF81CEF2), width: 1),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.account_balance_wallet_outlined,
+            color: Color(0xFF81CEF2),
+          ),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'เพิ่มช่องทางรับเงินเพื่อให้เพื่อนโอนคืนได้สะดวกขึ้น',
+              style: TextStyle(
+                color: Color(0xFF3E4A55),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => context.push('/payment-methods'),
+            child: const Text(
+              'เพิ่มเลย',
+              style: TextStyle(
+                color: Color(0xFF4BAEDC),
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _maybeAutoNavigatePaymentMethods(UserProfile profile) {
+    if (_hasQueuedPaymentAutoNav || profile.primaryPaymentMethod != null) {
+      return;
+    }
+
+    _hasQueuedPaymentAutoNav = true;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final key = 'payment_methods_autonav_seen_${profile.id}';
+      final hasSeen = prefs.getBool(key) ?? false;
+
+      if (hasSeen) return;
+
+      await prefs.setBool(key, true);
+      if (!mounted) return;
+
+      context.push('/payment-methods');
+    });
   }
 
   Widget _buildStatItem(String label, String value) {

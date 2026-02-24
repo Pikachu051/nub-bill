@@ -6,6 +6,7 @@ import 'package:nubbill/screens/friend_bills_page.dart';
 import 'package:nubbill/services/expense_service.dart';
 import 'package:nubbill/services/payment_service.dart';
 import 'package:nubbill/services/trip_service.dart';
+import 'package:nubbill/widgets/half_width_tab_indicator.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
 
 class ManageBalancePage extends ConsumerStatefulWidget {
@@ -98,8 +99,13 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
                       controller: _tabController,
                       labelColor: const Color(0xFF81CEF2),
                       unselectedLabelColor: const Color(0xFF7E7E7E),
-                      indicatorColor: const Color(0xFF81CEF2),
-                      indicatorWeight: 3,
+                      indicatorSize: TabBarIndicatorSize.tab,
+                      indicator: const HalfWidthTabIndicator(
+                        color: Color(0xFF81CEF2),
+                        thickness: 3,
+                        widthFactor: 0.5,
+                        radius: 2,
+                      ),
                       labelStyle: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,

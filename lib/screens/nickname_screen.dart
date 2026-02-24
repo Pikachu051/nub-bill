@@ -91,7 +91,10 @@ class _NicknameScreenState extends ConsumerState<NicknameScreen> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide(color: primaryColor, width: 2),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFBDBDBD),
+                        width: 1.5,
+                      ),
                     ),
                   ),
                 ),

@@ -133,6 +133,8 @@ class _FriendBillsPageState extends State<FriendBillsPage> {
             style: TextButton.styleFrom(
               foregroundColor: const Color(0xFF82CEF2),
               padding: const EdgeInsets.only(right: 14),
+              splashFactory: NoSplash.splashFactory,
+              overlayColor: Colors.transparent,
             ),
             child: Row(
               children: [
@@ -163,7 +165,7 @@ class _FriendBillsPageState extends State<FriendBillsPage> {
                     ),
                   )
                 : ListView.builder(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+                    padding: const EdgeInsets.fromLTRB(0, 8, 0, 16),
                     itemCount: widget.bills.length,
                     itemBuilder: (context, index) {
                       final bill = widget.bills[index];
@@ -263,7 +265,7 @@ class _BillRow extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 9),
+        padding: const EdgeInsets.fromLTRB(20, 9, 20, 9),
         child: Row(
           children: [
             Icon(

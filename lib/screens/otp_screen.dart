@@ -128,6 +128,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                   width: 45,
                   height: 55,
                   child: TextField(
+                    cursorColor: const Color(0xFF141416),
                     controller: _controllers[index],
                     focusNode: _focusNodes[index],
                     autofocus: index == 0,
@@ -138,10 +139,24 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
                       counterText: '',
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFBDBDBD),
+                          width: 1,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFBDBDBD),
+                          width: 1,
+                        ),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: primaryColor, width: 2),
+                        borderSide: const BorderSide(
+                          color: Color(0xFFBDBDBD),
+                          width: 1,
+                        ),
                       ),
                     ),
                     onChanged: (value) => _onDigitChanged(index, value),

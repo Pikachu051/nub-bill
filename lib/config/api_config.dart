@@ -16,11 +16,17 @@ class ApiConfig {
   /// `--dart-define=API_BASE_URL=http://<host>:3000`
   static String get baseUrl {
     const override = String.fromEnvironment('API_BASE_URL');
-    if (override.isNotEmpty) return override;
+    if (override.isNotEmpty) {
+      return override;
+    }
 
-    if (kIsWeb) return 'http://10.0.24.2:3001';
+    if (kIsWeb) {
+      return 'http://10.0.24.2:3001';
+    }
     // if (Platform.isAndroid) return 'http://10.0.2.2:3000'; // Android emulator
-    if (Platform.isAndroid) return 'http://10.0.24.2:3001'; // Wireless Debugging
+    if (Platform.isAndroid) {
+      return 'http://10.0.24.2:3001'; // Wireless Debugging
+    }
     return 'http://10.0.24.2:3001'; // iOS simulator / desktop
   }
 
@@ -55,10 +61,9 @@ class ApiClient {
   /// GET request
   Future<ApiResponse> get(String endpoint) async {
     try {
-      final response = await _client.get(
-        Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
-        headers: _headers,
-      ).timeout(_timeout);
+      final response = await _client
+          .get(Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'), headers: _headers)
+          .timeout(_timeout);
       return ApiResponse.fromHttpResponse(response);
     } catch (e) {
       return ApiResponse.error(e.toString());
@@ -71,11 +76,13 @@ class ApiClient {
     Map<String, dynamic>? body,
   }) async {
     try {
-      final response = await _client.post(
-        Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
-        headers: _headers,
-        body: body != null ? jsonEncode(body) : null,
-      ).timeout(_timeout);
+      final response = await _client
+          .post(
+            Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
+            headers: _headers,
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(_timeout);
       return ApiResponse.fromHttpResponse(response);
     } catch (e) {
       return ApiResponse.error(e.toString());
@@ -88,11 +95,13 @@ class ApiClient {
     Map<String, dynamic>? body,
   }) async {
     try {
-      final response = await _client.patch(
-        Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
-        headers: _headers,
-        body: body != null ? jsonEncode(body) : null,
-      ).timeout(_timeout);
+      final response = await _client
+          .patch(
+            Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
+            headers: _headers,
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(_timeout);
       return ApiResponse.fromHttpResponse(response);
     } catch (e) {
       return ApiResponse.error(e.toString());
@@ -102,10 +111,12 @@ class ApiClient {
   /// DELETE request
   Future<ApiResponse> delete(String endpoint) async {
     try {
-      final response = await _client.delete(
-        Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
-        headers: _headers,
-      ).timeout(_timeout);
+      final response = await _client
+          .delete(
+            Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
+            headers: _headers,
+          )
+          .timeout(_timeout);
       return ApiResponse.fromHttpResponse(response);
     } catch (e) {
       return ApiResponse.error(e.toString());
@@ -115,11 +126,13 @@ class ApiClient {
   /// PUT request
   Future<ApiResponse> put(String endpoint, {Map<String, dynamic>? body}) async {
     try {
-      final response = await _client.put(
-        Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
-        headers: _headers,
-        body: body != null ? jsonEncode(body) : null,
-      ).timeout(_timeout);
+      final response = await _client
+          .put(
+            Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
+            headers: _headers,
+            body: body != null ? jsonEncode(body) : null,
+          )
+          .timeout(_timeout);
       return ApiResponse.fromHttpResponse(response);
     } catch (e) {
       return ApiResponse.error(e.toString());
@@ -138,7 +151,10 @@ class ApiClient {
         Uri.parse('${ApiConfig.apiBaseUrl}$endpoint'),
       );
 
-      request.headers.addAll(_headers);
+      final token = _accessToken;
+      if (token != null) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
       request.files.add(
         http.MultipartFile.fromBytes('file', fileBytes, filename: fileName),
       );

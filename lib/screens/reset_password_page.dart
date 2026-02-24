@@ -145,10 +145,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF81CEF2),
-                          width: 2,
-                        ),
+                        borderSide: BorderSide.none,
                       ),
                       errorBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
@@ -198,10 +195,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),
-                        borderSide: const BorderSide(
-                          color: Color(0xFF81CEF2),
-                          width: 2,
-                        ),
+                        borderSide: BorderSide.none,
                       ),
                       errorBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(30),

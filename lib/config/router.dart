@@ -18,6 +18,8 @@ import 'package:nubbill/screens/upload_slip_screen.dart';
 import 'package:nubbill/screens/group_detail_page.dart';
 import 'package:nubbill/screens/friends_screen.dart';
 import 'package:nubbill/screens/profile_screen.dart';
+import 'package:nubbill/screens/payment_methods_screen.dart';
+import 'package:nubbill/screens/add_payment_method_screen.dart';
 import 'package:nubbill/screens/authentication_page.dart';
 import 'package:nubbill/screens/register_page.dart';
 import 'package:nubbill/screens/notifications_screen.dart';
@@ -213,6 +215,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/reset-password',
         builder: (context, state) => const ResetPasswordPage(),
       ),
+      GoRoute(
+        path: '/payment-methods',
+        redirect: (context, state) => '/profile/payment-methods',
+      ),
+      GoRoute(
+        path: '/add-payment-method',
+        builder: (context, state) => const AddPaymentMethodScreen(),
+      ),
 
       // Bottom Nav Shell - 4 tabs matching design
       StatefulShellRoute.indexedStack(
@@ -260,6 +270,12 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: '/profile',
                 builder: (context, state) => const ProfileScreen(),
+                routes: [
+                  GoRoute(
+                    path: 'payment-methods',
+                    builder: (context, state) => const PaymentMethodsScreen(),
+                  ),
+                ],
               ),
             ],
           ),

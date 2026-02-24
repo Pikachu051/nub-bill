@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nubbill/config/api_config.dart';
 import 'package:nubbill/services/auth_repository.dart';
 
 /// Provider for ProfileService
@@ -16,6 +17,14 @@ final myProfileProvider = FutureProvider.autoDispose<UserProfile>((ref) async {
 
   final service = ref.read(profileServiceProvider);
   return service.getMyProfile();
+});
+
+/// Provider for current user's payment methods
+final paymentMethodsProvider = FutureProvider.autoDispose<List<PaymentMethod>>((
+  ref,
+) async {
+  final service = ref.read(profileServiceProvider);
+  return service.getPaymentMethods();
 });
 
 /// User profile with stats
@@ -75,25 +84,41 @@ class ProfileStats {
 class PaymentMethod {
   final String id;
   final String type;
-  final String promptpayId;
+  final String? promptpayId;
   final String? promptpayName;
   final bool isPrimary;
+  final String? bankName;
+  final String? accountNumber;
+  final String? accountName;
+  final String? displayName;
+  final String? qrImageUrl;
 
   PaymentMethod({
     required this.id,
     required this.type,
-    required this.promptpayId,
+    this.promptpayId,
     this.promptpayName,
     required this.isPrimary,
+    this.bankName,
+    this.accountNumber,
+    this.accountName,
+    this.displayName,
+    this.qrImageUrl,
   });
 
   factory PaymentMethod.fromJson(Map<String, dynamic> json) {
     return PaymentMethod(
       id: json['id'] as String,
       type: json['type'] as String? ?? 'promptpay',
-      promptpayId: json['promptpay_id'] as String? ?? '',
-      promptpayName: json['display_name'] as String?,
+      promptpayId: json['promptpay_id'] as String?,
+      promptpayName:
+          json['promptpay_name'] as String? ?? json['display_name'] as String?,
       isPrimary: json['is_primary'] as bool? ?? false,
+      bankName: json['bank_name'] as String?,
+      accountNumber: json['account_number'] as String?,
+      accountName: json['account_name'] as String?,
+      displayName: json['display_name'] as String?,
+      qrImageUrl: json['qr_image_url'] as String?,
     );
   }
 }
@@ -102,8 +127,9 @@ class PaymentMethod {
 /// Schema uses `profiles` table (not users)
 class ProfileService {
   final SupabaseClient _supabase;
+  final ApiClient _apiClient;
 
-  ProfileService(this._supabase);
+  ProfileService(this._supabase) : _apiClient = ApiClient();
 
   String get _userId => _supabase.auth.currentUser!.id;
 
@@ -229,9 +255,34 @@ class ProfileService {
 
   /// Add payment method
   Future<PaymentMethod> addPaymentMethod({
-    required String promptpayId,
-    String? displayName,
+    required String type,
+    String? promptpayId,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+    required String displayName,
+    String? qrImageUrl,
   }) async {
+    if (type != 'promptpay' && type != 'bank_account') {
+      throw Exception('Invalid payment method type');
+    }
+
+    if (type == 'promptpay' && (promptpayId == null || promptpayId.isEmpty)) {
+      throw Exception('PromptPay ID is required');
+    }
+
+    if (type == 'bank_account') {
+      if (bankName == null || bankName.isEmpty) {
+        throw Exception('Bank name is required');
+      }
+      if (accountNumber == null || accountNumber.isEmpty) {
+        throw Exception('Account number is required');
+      }
+      if (accountName == null || accountName.isEmpty) {
+        throw Exception('Account name is required');
+      }
+    }
+
     // Check if any payment methods exist
     final existing = await _supabase
         .from('payment_methods')
@@ -239,20 +290,60 @@ class ProfileService {
         .eq('user_id', _userId);
 
     final isPrimary = (existing as List).isEmpty;
+    final payload = <String, dynamic>{
+      'user_id': _userId,
+      'type': type,
+      'display_name': displayName,
+      'is_primary': isPrimary,
+    };
+
+    if (promptpayId != null && promptpayId.isNotEmpty) {
+      payload['promptpay_id'] = promptpayId;
+    }
+    if (bankName != null && bankName.isNotEmpty) {
+      payload['bank_name'] = bankName;
+    }
+    if (accountNumber != null && accountNumber.isNotEmpty) {
+      payload['account_number'] = accountNumber;
+    }
+    if (accountName != null && accountName.isNotEmpty) {
+      payload['account_name'] = accountName;
+    }
+    if (qrImageUrl != null && qrImageUrl.isNotEmpty) {
+      payload['qr_image_url'] = qrImageUrl;
+    }
 
     final result = await _supabase
         .from('payment_methods')
-        .insert({
-          'user_id': _userId,
-          'type': 'promptpay',
-          'promptpay_id': promptpayId,
-          'display_name': displayName ?? 'PromptPay',
-          'is_primary': isPrimary,
-        })
+        .insert(payload)
         .select()
         .single();
 
     return PaymentMethod.fromJson(result);
+  }
+
+  /// Upload QR image through backend and get public URL.
+  Future<String> uploadPaymentQr(
+    List<int> fileBytes, {
+    String fileName = 'payment_qr.jpg',
+  }) async {
+    final response = await _apiClient.uploadFile(
+      '/profile/payment-methods/upload-qr',
+      fileBytes,
+      fileName,
+    );
+
+    if (!response.isSuccess || response.data == null) {
+      throw Exception(response.error ?? 'Failed to upload QR code image');
+    }
+
+    final data = response.data as Map<String, dynamic>;
+    final qrImageUrl = data['qr_image_url'] as String?;
+    if (qrImageUrl == null || qrImageUrl.isEmpty) {
+      throw Exception('Invalid QR image URL response');
+    }
+
+    return qrImageUrl;
   }
 
   /// Delete payment method

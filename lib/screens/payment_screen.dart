@@ -57,8 +57,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         _isLoading = false;
       });
     } catch (e) {
+      final msg = e.toString().replaceFirst('Exception: ', '');
       setState(() {
-        _error = e.toString();
+        _error = msg;
         _isLoading = false;
       });
     }
@@ -124,8 +125,9 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  'ไม่สามารถสร้าง QR ได้',
+                                  _error ?? 'ไม่สามารถสร้าง QR ได้',
                                   style: TextStyle(color: Colors.red[700]),
+                                  textAlign: TextAlign.center,
                                 ),
                               ],
                             )

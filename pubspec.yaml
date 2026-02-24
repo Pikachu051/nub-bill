@@ -94,6 +94,12 @@ flutter:
     - assets/images/cover_placeholder.jpg
     - assets/images/default_trip.jpg
     - assets/images/nub_bill_logo.png
+    - assets/images/kasikorn.png
+    - assets/images/scb.png
+    - assets/images/bangkok.png
+    - assets/images/krungthai.png
+    - assets/images/krungsri.png
+    - assets/images/prompt-pay.png
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

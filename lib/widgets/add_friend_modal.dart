@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -9,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:nubbill/config/theme.dart';
 import 'package:nubbill/services/friend_service.dart';
+import 'package:nubbill/widgets/half_width_tab_indicator.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
@@ -79,7 +79,13 @@ class _AddFriendModalState extends ConsumerState<AddFriendModal>
             controller: _tabController,
             labelColor: AppTheme.primaryColor,
             unselectedLabelColor: Colors.grey,
-            indicatorColor: AppTheme.primaryColor,
+            indicatorSize: TabBarIndicatorSize.tab,
+            indicator: const HalfWidthTabIndicator(
+              color: AppTheme.primaryColor,
+              thickness: 2,
+              widthFactor: 0.5,
+              radius: 2,
+            ),
             tabs: const [
               Tab(text: 'คิวอาร์โค้ด'),
               Tab(text: 'ค้นหา'),
