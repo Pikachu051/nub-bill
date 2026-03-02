@@ -4,7 +4,7 @@ class AppTheme {
   static const primaryColor = Color(0xFF81CEF2); // Sky Blue from Login Page
   static const secondaryColor = Color(0xFF141416); // Dark background
   static const errorColor = Color(0xFFE53935);
-  static const successColor = Color(0xFF43A047);
+  static const successColor = Color(0xFF3ECC58);
 
   // Line Seed Sans TH font family
   static const String fontFamily = 'LINESeedSansTH';

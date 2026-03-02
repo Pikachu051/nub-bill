@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:nubbill/services/auth_repository.dart';
 import 'package:nubbill/services/profile_service.dart';
 import 'package:nubbill/models/trip_model.dart';
+import 'package:nubbill/config/theme.dart';
 import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
 
@@ -438,8 +439,8 @@ class HomePage extends ConsumerWidget {
                         Text(
                           '${_formatMoney(toReceive)}฿',
                           style: TextStyle(
-                            color: Colors.green[600],
-                            fontWeight: FontWeight.bold,
+                            color: AppTheme.successColor,
+                            fontWeight: FontWeight.w400,
                             fontSize: 16,
                           ),
                         ),
@@ -474,7 +475,7 @@ class HomePage extends ConsumerWidget {
                           '${_formatMoney(toPay)}฿',
                           style: TextStyle(
                             color: Colors.red[400],
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w400,
                             fontSize: 16,
                           ),
                         ),
@@ -569,8 +570,8 @@ class HomePage extends ConsumerWidget {
     final statusLabel = isPositive
         ? 'รอรับเงิน'
         : (isNegative ? 'ค้างจ่าย' : 'เคลียร์');
-    final amountColor = isPositive
-        ? const Color(0xFF81CEF2)
+    final statusAndAmountColor = isPositive
+        ? AppTheme.successColor
         : (isNegative ? Colors.red[400] : Colors.grey[500]);
 
     return Card(
@@ -601,14 +602,18 @@ class HomePage extends ConsumerWidget {
           children: [
             Text(
               statusLabel,
-              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              style: TextStyle(
+                color: statusAndAmountColor,
+                fontSize: 12,
+                fontWeight: FontWeight.w400,
+              ),
             ),
             const SizedBox(height: 2),
             Text(
               '${_formatMoney(balance.abs())}฿',
               style: TextStyle(
-                color: amountColor,
-                fontWeight: FontWeight.bold,
+                color: statusAndAmountColor,
+                fontWeight: FontWeight.w400,
                 fontSize: 14,
               ),
             ),
