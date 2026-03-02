@@ -11,7 +11,9 @@ import 'package:nubbill/services/profile_service.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 class AddPaymentMethodScreen extends ConsumerStatefulWidget {
-  const AddPaymentMethodScreen({super.key});
+  final PaymentMethod? editingMethod;
+
+  const AddPaymentMethodScreen({super.key, this.editingMethod});
 
   @override
   ConsumerState<AddPaymentMethodScreen> createState() =>
@@ -29,8 +31,34 @@ class _AddPaymentMethodScreenState
   bool _isUploadingQr = false;
   Uint8List? _qrPreview;
   String? _qrImageUrl;
+  String? _existingQrImageUrl;
 
   bool get _isPromptPay => _selectedOption.id == 'promptpay';
+  bool get _isEditing => widget.editingMethod != null;
+
+  @override
+  void initState() {
+    super.initState();
+
+    final editingMethod = widget.editingMethod;
+    if (editingMethod == null) return;
+
+    if (editingMethod.type == 'promptpay') {
+      _selectedOption = PaymentChannelOptions.promptPay;
+      _accountController.text = editingMethod.promptpayId ?? '';
+    } else {
+      _selectedOption =
+          PaymentChannelOptions.byBankName(
+            editingMethod.bankName ?? editingMethod.displayName,
+          ) ??
+          PaymentChannelOptions.kasikorn;
+      _accountController.text = editingMethod.accountNumber ?? '';
+    }
+
+    _accountNameController.text = editingMethod.accountName ?? '';
+    _qrImageUrl = editingMethod.qrImageUrl;
+    _existingQrImageUrl = editingMethod.qrImageUrl;
+  }
 
   @override
   void dispose() {
@@ -48,7 +76,7 @@ class _AddPaymentMethodScreenState
         centerTitle: true,
         elevation: 0,
         automaticallyImplyLeading: false,
-        title: const Text('เพิ่มบัญชีรับเงิน'),
+        title: Text(_isEditing ? 'แก้ไขบัญชีรับเงิน' : 'เพิ่มบัญชีรับเงิน'),
         actions: [
           IconButton(
             onPressed: () {
@@ -85,7 +113,7 @@ class _AddPaymentMethodScreenState
                     _buildField(
                       controller: _accountController,
                       hint: _isPromptPay
-                          ? 'กรอก ID หรือเบอร์โทร'
+                          ? 'กรอกเลขบัตรประชาชน หรือ เบอร์โทรที่ผูก PromptPay'
                           : 'กรอกเลขบัญชี',
                       keyboardType: TextInputType.phone,
                     ),
@@ -140,6 +168,40 @@ class _AddPaymentMethodScreenState
                                         Image.memory(
                                           _qrPreview!,
                                           fit: BoxFit.contain,
+                                        ),
+                                        if (_isUploadingQr)
+                                          Container(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.16,
+                                            ),
+                                            alignment: Alignment.center,
+                                            child:
+                                                const CircularProgressIndicator(),
+                                          ),
+                                      ],
+                                    ),
+                                  )
+                                : _existingQrImageUrl != null
+                                ? ClipRRect(
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        Image.network(
+                                          _existingQrImageUrl!,
+                                          fit: BoxFit.contain,
+                                          errorBuilder:
+                                              (
+                                                context,
+                                                error,
+                                                stackTrace,
+                                              ) => const Center(
+                                                child: Icon(
+                                                  Icons.broken_image_outlined,
+                                                  size: 42,
+                                                  color: Color(0xFF8C9093),
+                                                ),
+                                              ),
                                         ),
                                         if (_isUploadingQr)
                                           Container(
@@ -217,9 +279,9 @@ class _AddPaymentMethodScreenState
                             ),
                           ),
                         )
-                      : const Text(
-                          'เพิ่มช่องทางรับเงิน',
-                          style: TextStyle(
+                      : Text(
+                          _isEditing ? 'บันทึกการแก้ไข' : 'เพิ่มช่องทางรับเงิน',
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
@@ -251,6 +313,10 @@ class _AddPaymentMethodScreenState
 
         return InkWell(
           borderRadius: BorderRadius.circular(999),
+          splashFactory: NoSplash.splashFactory,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          hoverColor: Colors.transparent,
           onTap: () => setState(() => _selectedOption = option),
           child: Row(
             children: [
@@ -392,6 +458,7 @@ class _AddPaymentMethodScreenState
       if (!mounted) return;
 
       setState(() => _qrImageUrl = qrUrl);
+      _existingQrImageUrl = qrUrl;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('อัพโหลด QR Code สำเร็จ'),
@@ -430,30 +497,32 @@ class _AddPaymentMethodScreenState
     setState(() => _isUploadingQr = true);
 
     try {
-      final payload = _buildPromptPayPayload(input);
-      final painter = QrPainter(
-        data: payload,
-        version: QrVersions.auto,
-        eyeStyle: const QrEyeStyle(
-          eyeShape: QrEyeShape.square,
-          color: Color(0xFF2E2E2E),
-        ),
-        dataModuleStyle: const QrDataModuleStyle(
-          dataModuleShape: QrDataModuleShape.square,
-          color: Color(0xFF2E2E2E),
-        ),
-      );
+      Uint8List? bytes;
+      Object? lastError;
 
-      final byteData = await painter.toImageData(
-        1024,
-        format: ui.ImageByteFormat.png,
-      );
+      final candidates = _buildPromptPayPayloadCandidates(input);
+      debugPrint('[PromptPay QR] Generating QR for input: $input');
+      debugPrint('[PromptPay QR] ${candidates.length} payload candidate(s)');
 
-      if (byteData == null) {
-        throw Exception('ไม่สามารถสร้างรูป QR ได้');
+      for (final payload in candidates) {
+        try {
+          debugPrint('[PromptPay QR] Trying payload (${payload.length} chars): ${payload.substring(0, math.min(40, payload.length))}...');
+          bytes = await _renderQrBytes(payload);
+          debugPrint('[PromptPay QR] QR rendered successfully');
+          break;
+        } catch (error) {
+          debugPrint('[PromptPay QR] Render failed: $error');
+          lastError = error;
+        }
       }
 
-      final bytes = byteData.buffer.asUint8List();
+      if (bytes == null) {
+        debugPrint('[PromptPay QR] All candidates failed. Last error: $lastError');
+        throw Exception(
+          'ไม่สามารถสร้าง QR ได้ กรุณาตรวจสอบเลข PromptPay ที่กรอก',
+        );
+      }
+
       final qrUrl = await ref
           .read(profileServiceProvider)
           .uploadPaymentQr(
@@ -467,6 +536,7 @@ class _AddPaymentMethodScreenState
       setState(() {
         _qrPreview = bytes;
         _qrImageUrl = qrUrl;
+        _existingQrImageUrl = qrUrl;
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -509,13 +579,15 @@ class _AddPaymentMethodScreenState
     }
 
     if (accountName.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('กรุณากรอกชื่อบัญชี'),
-          backgroundColor: Colors.red,
-        ),
-      );
-      return;
+      if (!_isPromptPay) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('กรุณากรอกชื่อบัญชี'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        return;
+      }
     }
 
     setState(() => _isSubmitting = true);
@@ -523,19 +595,36 @@ class _AddPaymentMethodScreenState
     try {
       final service = ref.read(profileServiceProvider);
 
-      await service.addPaymentMethod(
-        type: _isPromptPay ? 'promptpay' : 'bank_account',
-        promptpayId: _isPromptPay ? accountInput : null,
-        bankName: _isPromptPay
-            ? null
-            : PaymentChannelOptions.bankNameForBackend(_selectedOption),
-        accountNumber: _isPromptPay ? null : accountInput,
-        accountName: accountName,
-        displayName: _isPromptPay
-            ? PaymentChannelOptions.promptPay.displayName
-            : _selectedOption.displayName,
-        qrImageUrl: _qrImageUrl,
-      );
+      if (_isEditing) {
+        await service.updatePaymentMethod(
+          id: widget.editingMethod!.id,
+          type: _isPromptPay ? 'promptpay' : 'bank_account',
+          promptpayId: _isPromptPay ? accountInput : null,
+          bankName: _isPromptPay
+              ? null
+              : PaymentChannelOptions.bankNameForBackend(_selectedOption),
+          accountNumber: _isPromptPay ? null : accountInput,
+          accountName: _isPromptPay && accountName.isEmpty ? null : accountName,
+          displayName: _isPromptPay
+              ? PaymentChannelOptions.promptPay.displayName
+              : _selectedOption.displayName,
+          qrImageUrl: _qrImageUrl,
+        );
+      } else {
+        await service.addPaymentMethod(
+          type: _isPromptPay ? 'promptpay' : 'bank_account',
+          promptpayId: _isPromptPay ? accountInput : null,
+          bankName: _isPromptPay
+              ? null
+              : PaymentChannelOptions.bankNameForBackend(_selectedOption),
+          accountNumber: _isPromptPay ? null : accountInput,
+          accountName: _isPromptPay && accountName.isEmpty ? null : accountName,
+          displayName: _isPromptPay
+              ? PaymentChannelOptions.promptPay.displayName
+              : _selectedOption.displayName,
+          qrImageUrl: _qrImageUrl,
+        );
+      }
 
       ref.invalidate(paymentMethodsProvider);
       ref.invalidate(myProfileProvider);
@@ -561,15 +650,69 @@ class _AddPaymentMethodScreenState
     }
   }
 
-  String _buildPromptPayPayload(String rawInput) {
-    final digitsOnly = rawInput.replaceAll(RegExp(r'\D'), '');
+  Future<Uint8List> _renderQrBytes(String payload) async {
+    final painter = QrPainter(
+      data: payload,
+      version: QrVersions.auto,
+      eyeStyle: const QrEyeStyle(
+        eyeShape: QrEyeShape.square,
+        color: Color(0xFF2E2E2E),
+      ),
+      dataModuleStyle: const QrDataModuleStyle(
+        dataModuleShape: QrDataModuleShape.square,
+        color: Color(0xFF2E2E2E),
+      ),
+    );
 
-    if (digitsOnly.length != 10 && digitsOnly.length != 13) {
-      return 'PROMPTPAY:$digitsOnly';
+    final byteData = await painter.toImageData(
+      1024,
+      format: ui.ImageByteFormat.png,
+    );
+
+    if (byteData == null) {
+      throw Exception('ไม่สามารถสร้างรูป QR ได้');
     }
 
-    String proxyType;
-    String proxyValue;
+    return byteData.buffer.asUint8List();
+  }
+
+  List<String> _buildPromptPayPayloadCandidates(String rawInput) {
+    final normalizedDigits = _normalizePromptPayDigits(
+      rawInput.replaceAll(RegExp(r'\D'), ''),
+    );
+
+    final candidates = <String>{};
+    final emvPayload = _buildPromptPayPayload(normalizedDigits);
+    if (emvPayload != null) {
+      candidates.add(emvPayload);
+    }
+
+    if (normalizedDigits.isNotEmpty) {
+      candidates.add('PROMPTPAY:$normalizedDigits');
+      candidates.add(normalizedDigits);
+    }
+
+    candidates.add('PROMPTPAY:${rawInput.trim()}');
+    return candidates.toList();
+  }
+
+  String _normalizePromptPayDigits(String digits) {
+    if (digits.length == 11 && digits.startsWith('66')) {
+      return '0${digits.substring(2)}';
+    }
+    if (digits.length == 12 && digits.startsWith('660')) {
+      return '0${digits.substring(3)}';
+    }
+    return digits;
+  }
+
+  String? _buildPromptPayPayload(String digitsOnly) {
+    if (digitsOnly.length != 10 && digitsOnly.length != 13) {
+      return null;
+    }
+
+    final String proxyType;
+    final String proxyValue;
 
     if (digitsOnly.length == 10) {
       proxyType = '01';

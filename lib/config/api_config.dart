@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart' as http_parser;
 import 'package:nubbill/config/supabase_config.dart';
 
 /// API configuration constants
@@ -155,8 +156,14 @@ class ApiClient {
       if (token != null) {
         request.headers['Authorization'] = 'Bearer $token';
       }
+      final mimeType = _mimeTypeFromFileName(fileName);
       request.files.add(
-        http.MultipartFile.fromBytes('file', fileBytes, filename: fileName),
+        http.MultipartFile.fromBytes(
+          'file',
+          fileBytes,
+          filename: fileName,
+          contentType: http_parser.MediaType.parse(mimeType),
+        ),
       );
 
       final streamedResponse = await request.send();
@@ -165,6 +172,19 @@ class ApiClient {
     } catch (e) {
       return ApiResponse.error(e.toString());
     }
+  }
+
+  /// Infer MIME type from file name extension.
+  static String _mimeTypeFromFileName(String fileName) {
+    final ext = fileName.split('.').last.toLowerCase();
+    return switch (ext) {
+      'png' => 'image/png',
+      'jpg' || 'jpeg' => 'image/jpeg',
+      'gif' => 'image/gif',
+      'webp' => 'image/webp',
+      'svg' => 'image/svg+xml',
+      _ => 'application/octet-stream',
+    };
   }
 }
 

@@ -15,9 +15,21 @@ class PaymentMethodsScreen extends ConsumerStatefulWidget {
 
 class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
   String? _updatingMethodId;
+  final Set<String> _locallyRemovedIds = <String>{};
 
   Future<void> _goToAddPage() async {
     final result = await context.push<bool>('/add-payment-method');
+    if (result == true) {
+      ref.invalidate(paymentMethodsProvider);
+      ref.invalidate(myProfileProvider);
+    }
+  }
+
+  Future<void> _goToEditPage(PaymentMethod method) async {
+    final result = await context.push<bool>(
+      '/add-payment-method',
+      extra: method,
+    );
     if (result == true) {
       ref.invalidate(paymentMethodsProvider);
       ref.invalidate(myProfileProvider);
@@ -51,6 +63,9 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
       ref.invalidate(paymentMethodsProvider);
       ref.invalidate(myProfileProvider);
     } catch (e) {
+      if (mounted) {
+        setState(() => _locallyRemovedIds.remove(method.id));
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -97,7 +112,11 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
           onRetry: () => ref.invalidate(paymentMethodsProvider),
         ),
         data: (methods) {
-          if (methods.isEmpty) {
+          final visibleMethods = methods
+              .where((method) => !_locallyRemovedIds.contains(method.id))
+              .toList();
+
+          if (visibleMethods.isEmpty) {
             return _buildEmptyState();
           }
 
@@ -109,7 +128,7 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(22, 10, 22, 24),
               itemBuilder: (context, index) {
-                final method = methods[index];
+                final method = visibleMethods[index];
                 return Dismissible(
                   key: ValueKey(method.id),
                   direction: DismissDirection.endToStart,
@@ -139,16 +158,20 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
                     );
                     return confirmed ?? false;
                   },
-                  onDismissed: (_) => _deleteMethod(method),
+                  onDismissed: (_) {
+                    setState(() => _locallyRemovedIds.add(method.id));
+                    _deleteMethod(method);
+                  },
                   child: _PaymentMethodCard(
                     method: method,
                     isUpdating: _updatingMethodId == method.id,
                     onSelectPrimary: () => _setPrimary(method),
+                    onEdit: () => _goToEditPage(method),
                   ),
                 );
               },
               separatorBuilder: (context, _) => const SizedBox(height: 14),
-              itemCount: methods.length,
+              itemCount: visibleMethods.length,
             ),
           );
         },
@@ -221,11 +244,13 @@ class _PaymentMethodCard extends StatelessWidget {
   final PaymentMethod method;
   final bool isUpdating;
   final VoidCallback onSelectPrimary;
+  final VoidCallback onEdit;
 
   const _PaymentMethodCard({
     required this.method,
     required this.isUpdating,
     required this.onSelectPrimary,
+    required this.onEdit,
   });
 
   @override
@@ -242,6 +267,10 @@ class _PaymentMethodCard extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
+        splashFactory: NoSplash.splashFactory,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        hoverColor: Colors.transparent,
         onTap: onSelectPrimary,
         child: Container(
           padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
@@ -279,10 +308,17 @@ class _PaymentMethodCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 6),
-                        const Icon(
-                          Icons.edit,
-                          size: 14,
-                          color: Color(0xFF8A8A8A),
+                        GestureDetector(
+                          behavior: HitTestBehavior.opaque,
+                          onTap: onEdit,
+                          child: const Padding(
+                            padding: EdgeInsets.all(2),
+                            child: Icon(
+                              Icons.edit,
+                              size: 14,
+                              color: Color(0xFF8A8A8A),
+                            ),
+                          ),
                         ),
                       ],
                     ),

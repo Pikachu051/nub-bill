@@ -28,6 +28,7 @@ import 'package:nubbill/screens/reset_password_page.dart';
 import 'package:nubbill/screens/add_expense_screen.dart';
 import 'package:nubbill/models/trip_member_model.dart';
 import 'package:nubbill/models/trip_model.dart';
+import 'package:nubbill/services/profile_service.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -221,7 +222,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/add-payment-method',
-        builder: (context, state) => const AddPaymentMethodScreen(),
+        builder: (context, state) {
+          final extra = state.extra;
+          final editingMethod = extra is PaymentMethod ? extra : null;
+          return AddPaymentMethodScreen(editingMethod: editingMethod);
+        },
       ),
 
       // Bottom Nav Shell - 4 tabs matching design

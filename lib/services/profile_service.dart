@@ -322,6 +322,62 @@ class ProfileService {
     return PaymentMethod.fromJson(result);
   }
 
+  /// Update payment method
+  Future<PaymentMethod> updatePaymentMethod({
+    required String id,
+    required String type,
+    String? promptpayId,
+    String? bankName,
+    String? accountNumber,
+    String? accountName,
+    required String displayName,
+    String? qrImageUrl,
+  }) async {
+    if (type != 'promptpay' && type != 'bank_account') {
+      throw Exception('Invalid payment method type');
+    }
+
+    if (type == 'promptpay' && (promptpayId == null || promptpayId.isEmpty)) {
+      throw Exception('PromptPay ID is required');
+    }
+
+    if (type == 'bank_account') {
+      if (bankName == null || bankName.isEmpty) {
+        throw Exception('Bank name is required');
+      }
+      if (accountNumber == null || accountNumber.isEmpty) {
+        throw Exception('Account number is required');
+      }
+      if (accountName == null || accountName.isEmpty) {
+        throw Exception('Account name is required');
+      }
+    }
+
+    final payload = <String, dynamic>{
+      'type': type,
+      'display_name': displayName,
+      'promptpay_id': type == 'promptpay' ? promptpayId : null,
+      'bank_name': type == 'bank_account' ? bankName : null,
+      'account_number': type == 'bank_account' ? accountNumber : null,
+      'account_name': type == 'bank_account'
+          ? accountName
+          : (accountName != null && accountName.isNotEmpty
+                ? accountName
+                : null),
+      'qr_image_url': qrImageUrl,
+    };
+
+    final result = await _supabase
+        .from('payment_methods')
+        .update(payload)
+        .eq('id', id)
+        .eq('user_id', _userId)
+        .select()
+        .single();
+
+    return PaymentMethod.fromJson(result);
+  }
+
   /// Upload QR image through backend and get public URL.
   Future<String> uploadPaymentQr(
     List<int> fileBytes, {
