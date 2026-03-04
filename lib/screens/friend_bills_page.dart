@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:go_router/go_router.dart';
 
 class FriendBillItem {
@@ -121,7 +122,7 @@ class _FriendBillsPageState extends State<FriendBillsPage> {
         ),
         leading: IconButton(
           icon: const Icon(
-            Icons.chevron_left,
+            AppIcons.chevronLeft,
             color: Color(0xFF5E5E5E),
             size: 26,
           ),
@@ -140,8 +141,8 @@ class _FriendBillsPageState extends State<FriendBillsPage> {
               children: [
                 Icon(
                   _allSelected
-                      ? Icons.check_circle
-                      : Icons.radio_button_unchecked,
+                      ? AppIcons.checkCircleFilled
+                      : AppIcons.circleUnchecked,
                   size: 16,
                 ),
                 const SizedBox(width: 4),
@@ -226,7 +227,7 @@ class _FriendBillsPageState extends State<FriendBillsPage> {
                         borderRadius: BorderRadius.circular(26),
                       ),
                     ),
-                    icon: const Icon(Icons.qr_code_2, color: Colors.white),
+                    icon: const Icon(AppIcons.qrCode, color: Colors.white),
                     label: Text(
                       'สแกนจ่าย ${_selectedTotal.toStringAsFixed(2)}฿',
                       style: const TextStyle(
@@ -269,7 +270,7 @@ class _BillRow extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              selected ? Icons.check_circle : Icons.radio_button_unchecked,
+              selected ? AppIcons.checkCircleFilled : AppIcons.circleUnchecked,
               color: selected
                   ? const Color(0xFF80CDF1)
                   : const Color(0xFFC6CDD2),

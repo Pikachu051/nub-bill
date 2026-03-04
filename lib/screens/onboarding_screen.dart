@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/widgets/rounded_button.dart';
 
@@ -155,15 +156,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   IconData _getIcon(String name) {
     switch (name) {
       case 'group':
-        return Icons.group_outlined;
+        return AppIcons.people;
       case 'receipt':
-        return Icons.receipt_long_outlined;
+        return AppIcons.receipt;
       case 'qr_code':
-        return Icons.qr_code_scanner_outlined;
+        return AppIcons.qrScanner;
       case 'check':
-        return Icons.check_circle_outline;
+        return AppIcons.checkCircle;
       default:
-        return Icons.circle;
+        return AppIcons.circle;
     }
   }
 }

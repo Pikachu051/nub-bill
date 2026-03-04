@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -245,7 +246,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
               }
             },
             backgroundColor: const Color(0xFF81CEF2),
-            icon: const Icon(Icons.receipt_long, color: Colors.white),
+            icon: const Icon(AppIcons.receipt, color: Colors.white),
             label: const Text(
               'เพิ่มบิล',
               style: TextStyle(
@@ -279,11 +280,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
             shape: BoxShape.circle,
           ),
           child: IconButton(
-            icon: const Icon(
-              Icons.arrow_back_ios_new,
-              color: Colors.white,
-              size: 20,
-            ),
+            icon: const Icon(AppIcons.arrowBack, color: Colors.white, size: 20),
             onPressed: () {
               Navigator.of(context).maybePop();
             },
@@ -299,7 +296,11 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
               shape: BoxShape.circle,
             ),
             child: IconButton(
-              icon: const Icon(Icons.settings, color: Colors.white, size: 20),
+              icon: const Icon(
+                AppIcons.settings,
+                color: Colors.white,
+                size: 20,
+              ),
               onPressed: () async {
                 if (detail.myRole != 'admin') {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -515,7 +516,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 const Icon(
-                                  Icons.people,
+                                  AppIcons.people,
                                   color: Colors.white,
                                   size: 14,
                                 ),
@@ -580,7 +581,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
                                   const Icon(
-                                    Icons.flight_takeoff,
+                                    AppIcons.flightTakeoff,
                                     color: Colors.white,
                                     size: 14,
                                   ),
@@ -739,8 +740,8 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                       },
                       icon: Icon(
                         walletState.hasTimedOut
-                            ? Icons.refresh
-                            : Icons.refresh_outlined,
+                            ? AppIcons.refresh
+                            : AppIcons.refresh,
                         color: const Color(0xFF81CEF2),
                       ),
                     ),
@@ -767,7 +768,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    icon: const Icon(Icons.account_balance_wallet, size: 20),
+                    icon: const Icon(AppIcons.wallet, size: 20),
                     label: const Text(
                       'จัดการยอดเงิน',
                       style: TextStyle(
@@ -791,7 +792,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                     onPressed: () {
                       // Show chart/summary
                     },
-                    icon: const Icon(Icons.bar_chart, color: Color(0xFF81CEF2)),
+                    icon: const Icon(
+                      AppIcons.barChart,
+                      color: Color(0xFF81CEF2),
+                    ),
                   ),
                 ),
               ],
@@ -823,7 +827,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.receipt_long, size: 64, color: Colors.grey[300]),
+            Icon(AppIcons.receipt, size: 64, color: Colors.grey[300]),
             const SizedBox(height: 16),
             const Text('ยังไม่มีรายการ', style: TextStyle(color: Colors.grey)),
           ],
@@ -906,7 +910,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
           if (dateText ==
                   '${DateTime.now().day} ${thaiMonths[DateTime.now().month]} ${DateTime.now().year + 543}' ||
               true) // Hardcoding for exact match placeholder
-            Icon(Icons.tune, size: 20, color: const Color(0xFF4A4A4A)),
+            Icon(AppIcons.tune, size: 20, color: const Color(0xFF4A4A4A)),
         ],
       ),
     );
@@ -1240,11 +1244,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.check_circle_outline,
-                  size: 64,
-                  color: Colors.green[300],
-                ),
+                Icon(AppIcons.checkCircle, size: 64, color: Colors.green[300]),
                 const SizedBox(height: 16),
                 const Text(
                   'ไม่มียอดค้างชำระ',
@@ -1300,7 +1300,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
           title,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
-        Icon(Icons.tune, size: 20, color: Colors.grey[400]),
+        Icon(AppIcons.tune, size: 20, color: Colors.grey[400]),
       ],
     );
   }
@@ -1351,6 +1351,9 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                 'amount': debt.amount,
                 'memberId': debt.toMemberId,
                 'tripId': widget.groupId,
+                'payeeName': debt.toName,
+                'payeeAvatarUrl': debt.toAvatarUrl,
+                'promptpayId': null,
               },
             );
           }
@@ -1399,12 +1402,12 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                 ),
               ),
               if (iOwe || theyOweMe)
-                Icon(Icons.chevron_right, color: Colors.grey[400]),
+                Icon(AppIcons.chevronRight, color: Colors.grey[400]),
               if (theyOweMe)
                 Padding(
                   padding: const EdgeInsets.only(left: 4),
                   child: Icon(
-                    Icons.notifications_active,
+                    AppIcons.notificationsActive,
                     size: 20,
                     color: const Color(0xFF81CEF2),
                   ),

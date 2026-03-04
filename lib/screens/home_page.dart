@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/services/auth_repository.dart';
@@ -257,7 +258,7 @@ class HomePage extends ConsumerWidget {
                                   : null,
                               child: avatarUrl == null
                                   ? const Icon(
-                                      Icons.person,
+                                      AppIcons.person,
                                       size: 30,
                                       color: Colors.white,
                                     )
@@ -337,7 +338,7 @@ class HomePage extends ConsumerWidget {
         onPressed: () => context.push('/groups/create'),
         backgroundColor: const Color(0xFF81CEF2),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-        icon: const Icon(Icons.people, color: Colors.white),
+        icon: const Icon(AppIcons.people, color: Colors.white),
         label: Row(
           mainAxisSize: MainAxisSize.min,
           children: const [
@@ -357,7 +358,7 @@ class HomePage extends ConsumerWidget {
               ),
             ),
             SizedBox(width: 8),
-            Icon(Icons.keyboard_arrow_up, color: Colors.white, size: 24),
+            Icon(AppIcons.chevronUp, color: Colors.white, size: 24),
           ],
         ),
       ),
@@ -420,7 +421,7 @@ class HomePage extends ConsumerWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              Icons.arrow_downward,
+                              AppIcons.arrowDown,
                               size: 16,
                               color: Colors.green[600],
                             ),
@@ -455,7 +456,7 @@ class HomePage extends ConsumerWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              Icons.arrow_upward,
+                              AppIcons.arrowUp,
                               size: 16,
                               color: Colors.red[400],
                             ),
@@ -505,7 +506,7 @@ class HomePage extends ConsumerWidget {
           onPressed: () {
             // TODO: Show filter options
           },
-          icon: Icon(Icons.tune, color: Colors.grey[600]),
+          icon: Icon(AppIcons.tune, color: Colors.grey[600]),
         ),
       ],
     );
@@ -536,7 +537,7 @@ class HomePage extends ConsumerWidget {
               padding: const EdgeInsets.all(40),
               child: Column(
                 children: [
-                  Icon(Icons.group_outlined, size: 64, color: Colors.grey[300]),
+                  Icon(AppIcons.groups, size: 64, color: Colors.grey[300]),
                   const SizedBox(height: 16),
                   Text(
                     'ยังไม่มีกลุ่ม',

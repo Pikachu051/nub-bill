@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 
 const String networkTimeoutMessage =
     'การเชื่อมต่อกับเซิร์ฟเวอร์ล้มเหลว ลองตรวจสอบเครือข่ายแล้วมาลองใหม่น้า';
@@ -54,7 +55,7 @@ class RetryErrorState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.wifi_off_rounded, size: 48, color: Colors.grey[500]),
+            Icon(AppIcons.wifiOff, size: 48, color: Colors.grey[500]),
             const SizedBox(height: 12),
             Text(
               message,
@@ -64,7 +65,7 @@ class RetryErrorState extends StatelessWidget {
             const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: onRetry,
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(AppIcons.refresh),
               label: const Text('ลองใหม่'),
             ),
           ],

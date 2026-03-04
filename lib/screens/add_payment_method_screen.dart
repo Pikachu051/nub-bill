@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -86,7 +87,11 @@ class _AddPaymentMethodScreenState
                 context.go('/payment-methods');
               }
             },
-            icon: const Icon(Icons.close, size: 34, color: Color(0xFF8B8B8B)),
+            icon: const Icon(
+              AppIcons.close,
+              size: 34,
+              color: Color(0xFF8B8B8B),
+            ),
           ),
           const SizedBox(width: 6),
         ],
@@ -191,17 +196,14 @@ class _AddPaymentMethodScreenState
                                           _existingQrImageUrl!,
                                           fit: BoxFit.contain,
                                           errorBuilder:
-                                              (
-                                                context,
-                                                error,
-                                                stackTrace,
-                                              ) => const Center(
-                                                child: Icon(
-                                                  Icons.broken_image_outlined,
-                                                  size: 42,
-                                                  color: Color(0xFF8C9093),
-                                                ),
-                                              ),
+                                              (context, error, stackTrace) =>
+                                                  const Center(
+                                                    child: Icon(
+                                                      AppIcons.imageOff,
+                                                      size: 42,
+                                                      color: Color(0xFF8C9093),
+                                                    ),
+                                                  ),
                                         ),
                                         if (_isUploadingQr)
                                           Container(
@@ -219,7 +221,7 @@ class _AddPaymentMethodScreenState
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
                                       const Icon(
-                                        Icons.qr_code_2_rounded,
+                                        AppIcons.qrCode,
                                         size: 56,
                                         color: Color(0xFF81CEF2),
                                       ),
@@ -331,7 +333,7 @@ class _AddPaymentMethodScreenState
                       : const Color(0xFFACB0B3),
                 ),
                 child: isSelected
-                    ? const Icon(Icons.check, size: 12, color: Colors.white)
+                    ? const Icon(AppIcons.check, size: 12, color: Colors.white)
                     : null,
               ),
               const SizedBox(width: 8),
@@ -410,13 +412,13 @@ class _AddPaymentMethodScreenState
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.camera_alt, color: Color(0xFF81CEF2)),
+              leading: const Icon(AppIcons.camera, color: Color(0xFF81CEF2)),
               title: const Text('ถ่ายรูป'),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(
-                Icons.photo_library,
+                AppIcons.photoLibrary,
                 color: Color(0xFF81CEF2),
               ),
               title: const Text('เลือกจากแกลเลอรี'),
@@ -506,7 +508,9 @@ class _AddPaymentMethodScreenState
 
       for (final payload in candidates) {
         try {
-          debugPrint('[PromptPay QR] Trying payload (${payload.length} chars): ${payload.substring(0, math.min(40, payload.length))}...');
+          debugPrint(
+            '[PromptPay QR] Trying payload (${payload.length} chars): ${payload.substring(0, math.min(40, payload.length))}...',
+          );
           bytes = await _renderQrBytes(payload);
           debugPrint('[PromptPay QR] QR rendered successfully');
           break;
@@ -517,7 +521,9 @@ class _AddPaymentMethodScreenState
       }
 
       if (bytes == null) {
-        debugPrint('[PromptPay QR] All candidates failed. Last error: $lastError');
+        debugPrint(
+          '[PromptPay QR] All candidates failed. Last error: $lastError',
+        );
         throw Exception(
           'ไม่สามารถสร้าง QR ได้ กรุณาตรวจสอบเลข PromptPay ที่กรอก',
         );

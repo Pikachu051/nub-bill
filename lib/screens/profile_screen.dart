@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -41,13 +42,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
               const SizedBox(height: 16),
               ListTile(
-                leading: const Icon(Icons.camera_alt, color: Color(0xFF81CEF2)),
+                leading: const Icon(AppIcons.camera, color: Color(0xFF81CEF2)),
                 title: const Text('ถ่ายรูป'),
                 onTap: () => Navigator.pop(context, ImageSource.camera),
               ),
               ListTile(
                 leading: const Icon(
-                  Icons.photo_library,
+                  AppIcons.photoLibrary,
                   color: Color(0xFF81CEF2),
                 ),
                 title: const Text('เลือกจากแกลเลอรี'),
@@ -295,7 +296,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)],
                 ),
                 child: Icon(
-                  Icons.camera_alt,
+                  AppIcons.camera,
                   color: _isUploadingAvatar
                       ? Colors.grey
                       : const Color(0xFF81CEF2),
@@ -313,35 +314,35 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return Column(
       children: [
         _buildSettingItem(
-          icon: Icons.person_outline,
+          icon: AppIcons.person,
           title: 'แก้ไขข้อมูลส่วนตัว',
           onTap: () {},
         ),
         _buildSettingItem(
-          icon: Icons.qr_code,
+          icon: AppIcons.qrCode,
           title: 'QR Code ของฉัน',
           onTap: () {},
         ),
         _buildSettingItem(
-          icon: Icons.notifications_none,
+          icon: AppIcons.notifications,
           title: 'การแจ้งเตือน',
           onTap: () {},
         ),
         _buildSettingItem(
-          icon: Icons.credit_card,
+          icon: AppIcons.creditCard,
           title: 'จัดการบัญชี / พร้อมเพย์',
           onTap: () => context.push('/payment-methods'),
         ),
 
         const Divider(),
         _buildSettingItem(
-          icon: Icons.help_outline,
+          icon: AppIcons.help,
           title: 'ช่วยเหลือ & สนับสนุน',
           onTap: () {},
         ),
 
         _buildSettingItem(
-          icon: Icons.logout,
+          icon: AppIcons.logout,
           title: 'ออกจากระบบ',
           color: Colors.red,
           onTap: () {
@@ -387,10 +388,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.account_balance_wallet_outlined,
-            color: Color(0xFF81CEF2),
-          ),
+          const Icon(AppIcons.wallet, color: Color(0xFF81CEF2)),
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
@@ -497,7 +495,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         title,
         style: TextStyle(color: color, fontWeight: FontWeight.w500),
       ),
-      trailing: const Icon(Icons.chevron_right, color: Colors.grey, size: 18),
+      trailing: const Icon(AppIcons.chevronRight, color: Colors.grey, size: 18),
       onTap: onTap,
     );
   }

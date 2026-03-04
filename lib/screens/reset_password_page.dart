@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nubbill/config/supabase_config.dart';
@@ -131,8 +132,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword
-                              ? Icons.visibility_off
-                              : Icons.visibility,
+                              ? AppIcons.visibilityOff
+                              : AppIcons.visibility,
                           color: Colors.grey,
                         ),
                         onPressed: () {
@@ -181,8 +182,8 @@ class _ResetPasswordPageState extends State<ResetPasswordPage> {
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscureConfirm
-                              ? Icons.visibility_off
-                              : Icons.visibility,
+                              ? AppIcons.visibilityOff
+                              : AppIcons.visibility,
                           color: Colors.grey,
                         ),
                         onPressed: () {

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 
 /// Notifications Screen - shows user notifications
 class NotificationsScreen extends StatelessWidget {
@@ -21,7 +22,7 @@ class NotificationsScreen extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.notifications_none, size: 80, color: Colors.grey[300]),
+            Icon(AppIcons.notifications, size: 80, color: Colors.grey[300]),
             const SizedBox(height: 16),
             Text(
               'ไม่มีการแจ้งเตือน',

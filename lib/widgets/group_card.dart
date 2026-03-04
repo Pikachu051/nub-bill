@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/models/trip_model.dart';
 
@@ -77,7 +78,11 @@ class GroupCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.people, size: 14, color: Colors.grey[500]),
+                        Icon(
+                          AppIcons.people,
+                          size: 14,
+                          color: Colors.grey[500],
+                        ),
                         const SizedBox(width: 4),
                         Text(
                           '${group.memberCount} คน',
@@ -89,7 +94,7 @@ class GroupCard extends StatelessWidget {
                         if (group.startDate != null) ...[
                           const SizedBox(width: 12),
                           Icon(
-                            Icons.calendar_today,
+                            AppIcons.calendar,
                             size: 12,
                             color: Colors.grey[500],
                           ),
@@ -127,7 +132,11 @@ class GroupCard extends StatelessWidget {
                       'เคลียร์',
                       style: TextStyle(color: Colors.grey[500], fontSize: 12),
                     ),
-                  Icon(Icons.chevron_right, color: Colors.grey[400], size: 20),
+                  Icon(
+                    AppIcons.chevronRight,
+                    color: Colors.grey[400],
+                    size: 20,
+                  ),
                 ],
               ),
             ],

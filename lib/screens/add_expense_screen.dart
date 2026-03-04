@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nubbill/models/expense_detail_model.dart';
 import 'package:nubbill/services/expense_service.dart';
@@ -395,7 +396,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.close, color: Colors.black),
+          icon: const Icon(AppIcons.close, color: Colors.black),
           onPressed: _isLoading ? null : () => Navigator.pop(context),
         ),
         title: Text(
@@ -456,7 +457,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                           labelText: 'รายละเอียด *',
                           hintText: 'เช่น ค่าอาหารเที่ยง',
                           border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.description),
+                          prefixIcon: Icon(AppIcons.description),
                         ),
                       ),
                     ),
@@ -473,7 +474,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                           labelText: 'ยอดเงิน *',
                           prefixText: '฿ ',
                           border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.attach_money),
+                          prefixIcon: Icon(AppIcons.money),
                         ),
                         style: const TextStyle(
                           fontSize: 20,
@@ -489,7 +490,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                         Expanded(
                           child: OutlinedButton.icon(
                             onPressed: _pickDate,
-                            icon: const Icon(Icons.calendar_today, size: 16),
+                            icon: const Icon(AppIcons.calendar, size: 16),
                             label: Text(
                               '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
                             ),
@@ -511,7 +512,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                             },
                             child: OutlinedButton.icon(
                               onPressed: null,
-                              icon: const Icon(Icons.person, size: 16),
+                              icon: const Icon(AppIcons.person, size: 16),
                               label: Text(
                                 _payerMemberId != null
                                     ? _memberState.firstWhere(

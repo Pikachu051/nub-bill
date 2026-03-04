@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -41,28 +42,28 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     {
       'key': 'travel',
       'label': 'ออกทริป',
-      'icon': Icons.flight,
+      'icon': AppIcons.flight,
       'color': const Color(0xFFF1F8E9), // Light green
       'iconColor': const Color(0xFFAED581),
     },
     {
       'key': 'accommodation',
       'label': 'ที่พัก',
-      'icon': Icons.home,
+      'icon': AppIcons.home,
       'color': const Color(0xFFE3F2FD), // Light blue
       'iconColor': const Color(0xFF90CAF9),
     },
     {
       'key': 'romance',
       'label': 'หวานใจ',
-      'icon': Icons.favorite,
+      'icon': AppIcons.favorite,
       'color': const Color(0xFFFCE4EC), // Light pink
       'iconColor': const Color(0xFFF48FB1),
     },
     {
       'key': 'food',
       'label': 'มื้ออาหาร',
-      'icon': Icons.restaurant,
+      'icon': AppIcons.restaurant,
       'color': const Color(0xFFFFFDE7), // Light yellow
       'iconColor': const Color(0xFFFFCC80),
     },
@@ -304,7 +305,11 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
           // Title
           Text(
             _isEditMode ? 'แก้ไขกลุ่ม' : 'เริ่มกลุ่มหารใหม่',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF4A4A4A)),
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF4A4A4A),
+            ),
           ),
 
           // Start Trip Button
@@ -353,11 +358,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                     : null,
               ),
               child: _coverImage == null && _initialCoverUrl == null
-                  ? const Icon(
-                      Icons.camera_alt_outlined,
-                      size: 32,
-                      color: Colors.grey,
-                    )
+                  ? const Icon(AppIcons.camera, size: 32, color: Colors.grey)
                   : null,
             ),
           ),
@@ -414,8 +415,6 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       ),
     );
   }
-
-
 
   Widget _buildDateSection() {
     String formatDate(DateTime date) {
@@ -481,11 +480,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
               ),
               child: Row(
                 children: [
-                   const Icon(
-                    Icons.calendar_today,
-                    size: 18,
-                    color: Colors.grey,
-                  ),
+                  const Icon(AppIcons.calendar, size: 18, color: Colors.grey),
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
@@ -631,16 +626,17 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                                   ? Image.network(
                                       friend.avatarUrl!,
                                       fit: BoxFit.cover,
-                                      errorBuilder: (context, error, stackTrace) =>
-                                          Center(
-                                            child: Text(
-                                              friend.nickname[0],
-                                              style: const TextStyle(
-                                                fontSize: 20,
-                                                fontWeight: FontWeight.w700,
+                                      errorBuilder:
+                                          (context, error, stackTrace) =>
+                                              Center(
+                                                child: Text(
+                                                  friend.nickname[0],
+                                                  style: const TextStyle(
+                                                    fontSize: 20,
+                                                    fontWeight: FontWeight.w700,
+                                                  ),
+                                                ),
                                               ),
-                                            ),
-                                          ),
                                     )
                                   : Center(
                                       child: Text(
@@ -669,7 +665,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(
-                                  Icons.close,
+                                  AppIcons.close,
                                   size: 14,
                                   color: Colors.white,
                                 ),
@@ -707,7 +703,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.search, color: Colors.grey, size: 20),
+            const Icon(AppIcons.search, color: Colors.grey, size: 20),
             const SizedBox(width: 12),
             Expanded(
               child: TextField(
@@ -857,7 +853,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                           ),
                           child: isSelected
                               ? const Icon(
-                                  Icons.check,
+                                  AppIcons.check,
                                   color: Colors.white,
                                   size: 18,
                                 )

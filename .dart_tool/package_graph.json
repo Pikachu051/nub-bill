@@ -15,11 +15,13 @@
         "freezed_annotation",
         "go_router",
         "google_fonts",
+        "google_mlkit_barcode_scanning",
         "http",
         "http_parser",
         "image_picker",
         "intl",
         "json_annotation",
+        "lucide_icons_flutter",
         "mobile_scanner",
         "path_provider",
         "qr_flutter",
@@ -134,6 +136,13 @@
         "stream_channel",
         "test_api",
         "vector_math"
+      ]
+    },
+    {
+      "name": "lucide_icons_flutter",
+      "version": "3.1.10",
+      "dependencies": [
+        "flutter"
       ]
     },
     {
@@ -1453,6 +1462,21 @@
       "version": "1.0.0",
       "dependencies": [
         "fixnum"
+      ]
+    },
+    {
+      "name": "google_mlkit_barcode_scanning",
+      "version": "0.12.1",
+      "dependencies": [
+        "flutter",
+        "google_mlkit_commons"
+      ]
+    },
+    {
+      "name": "google_mlkit_commons",
+      "version": "0.8.1",
+      "dependencies": [
+        "flutter"
       ]
     }
   ],

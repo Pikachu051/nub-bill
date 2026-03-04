@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/providers/groups_provider.dart';
@@ -31,7 +32,7 @@ class GroupsScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.group_outlined, size: 64, color: Colors.grey[300]),
+                  Icon(AppIcons.groups, size: 64, color: Colors.grey[300]),
                   const SizedBox(height: 16),
                   const Text(
                     'ยังไม่มีกลุ่ม',
@@ -71,7 +72,7 @@ class GroupsScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton(
         onPressed: () => context.push('/groups/create'),
         backgroundColor: const Color(0xFF81CEF2),
-        child: const Icon(Icons.add, color: Colors.white),
+        child: const Icon(AppIcons.add, color: Colors.white),
       ),
     );
   }

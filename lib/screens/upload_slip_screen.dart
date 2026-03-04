@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/widgets/rounded_button.dart';
 
@@ -67,7 +68,7 @@ class _UploadSlipScreenState extends State<UploadSlipScreen> {
                         children: [
                           const Center(
                             child: Icon(
-                              Icons.image,
+                              AppIcons.image,
                               size: 60,
                               color: Colors.blue,
                             ),
@@ -76,7 +77,10 @@ class _UploadSlipScreenState extends State<UploadSlipScreen> {
                             top: 10,
                             right: 10,
                             child: IconButton(
-                              icon: const Icon(Icons.close, color: Colors.red),
+                              icon: const Icon(
+                                AppIcons.close,
+                                color: Colors.red,
+                              ),
                               onPressed: () =>
                                   setState(() => _hasImage = false),
                             ),
@@ -87,7 +91,7 @@ class _UploadSlipScreenState extends State<UploadSlipScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: const [
                           Icon(
-                            Icons.add_photo_alternate_outlined,
+                            AppIcons.imagePlus,
                             size: 64,
                             color: Colors.grey,
                           ),

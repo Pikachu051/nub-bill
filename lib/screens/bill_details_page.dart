@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/services/expense_service.dart';
@@ -23,7 +24,7 @@ class BillDetailsPage extends ConsumerWidget {
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            icon: const Icon(AppIcons.arrowBack, color: Colors.black),
             onPressed: () => context.pop(),
           ),
         ),
@@ -34,7 +35,7 @@ class BillDetailsPage extends ConsumerWidget {
           backgroundColor: Colors.transparent,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            icon: const Icon(AppIcons.arrowBack, color: Colors.black),
             onPressed: () => context.pop(),
           ),
         ),
@@ -86,13 +87,13 @@ class BillDetailsPage extends ConsumerWidget {
         backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          icon: const Icon(AppIcons.arrowBack, color: Colors.black),
           onPressed: () => context.pop(),
         ),
         actions: canManageExpense
             ? [
                 IconButton(
-                  icon: const Icon(Icons.edit, color: Color(0xFF81CEF2)),
+                  icon: const Icon(AppIcons.edit, color: Color(0xFF81CEF2)),
                   onPressed: () async {
                     final updated = await context.push<bool>(
                       '/add_expense',
@@ -390,7 +391,7 @@ class BillDetailsPage extends ConsumerWidget {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        icon: const Icon(Icons.delete_outline),
+        icon: const Icon(AppIcons.delete),
         label: const Text(
           'ลบบิลนี้ชะ!',
           style: TextStyle(fontWeight: FontWeight.bold),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 
 /// Expense model matching the backend list response from GET /trips/:id/expenses
 class Expense {
@@ -54,25 +55,25 @@ class Expense {
         desc.contains('restaurant') ||
         desc.contains('แม็กโดนัล') ||
         desc.contains('7-eleven')) {
-      return Icons.restaurant;
+      return AppIcons.restaurant;
     }
     if (desc.contains('ที่พัก') ||
         desc.contains('โรงแรม') ||
         desc.contains('hotel') ||
         desc.contains('พัก')) {
-      return Icons.hotel;
+      return AppIcons.hotel;
     }
     if (desc.contains('น้ำมัน') ||
         desc.contains('ค่ารถ') ||
         desc.contains('แท็กซี่') ||
         desc.contains('เดินทาง') ||
         desc.contains('transport')) {
-      return Icons.directions_car;
+      return AppIcons.car;
     }
     if (desc.contains('เคลียร์') || desc.contains('clear')) {
-      return Icons.check_circle;
+      return AppIcons.checkCircle;
     }
-    return Icons.receipt;
+    return AppIcons.receipt;
   }
 
   /// Category color for the icon background
@@ -186,7 +187,8 @@ class ExpensePayerInfo {
     final profiles = payerMember?['profiles'] as Map<String, dynamic>?;
     return ExpensePayerInfo(
       memberId:
-          (json['member_id'] as String?) ?? (payerMember?['id'] as String? ?? ''),
+          (json['member_id'] as String?) ??
+          (payerMember?['id'] as String? ?? ''),
       amount: (json['amount'] as num?)?.toDouble() ?? 0,
       userId: payerMember?['user_id'] as String?,
       ghostName: payerMember?['ghost_name'] as String?,

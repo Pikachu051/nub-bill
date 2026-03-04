@@ -14,7 +14,6 @@ import 'package:nubbill/screens/create_group_screen.dart';
 import 'package:nubbill/screens/bill_details_page.dart';
 import 'package:nubbill/screens/payment_screen.dart';
 import 'package:nubbill/screens/manage_balance_page.dart';
-import 'package:nubbill/screens/upload_slip_screen.dart';
 import 'package:nubbill/screens/group_detail_page.dart';
 import 'package:nubbill/screens/friends_screen.dart';
 import 'package:nubbill/screens/profile_screen.dart';
@@ -182,6 +181,9 @@ final routerProvider = Provider<GoRouter>((ref) {
               amount: (extra['amount'] as num?)?.toDouble() ?? 0,
               memberId: extra['memberId'] as String?,
               tripId: extra['tripId'] as String?,
+              payeeName: extra['payeeName'] as String?,
+              payeeAvatarUrl: extra['payeeAvatarUrl'] as String?,
+              promptpayId: extra['promptpayId'] as String?,
               expenseSplitIds: splitIds,
             );
           }
@@ -199,10 +201,6 @@ final routerProvider = Provider<GoRouter>((ref) {
 
           return ManageBalancePage(groupId: groupId);
         },
-      ),
-      GoRoute(
-        path: '/upload_slip',
-        builder: (context, state) => const UploadSlipScreen(),
       ),
       GoRoute(
         path: '/register',

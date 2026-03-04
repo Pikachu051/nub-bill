@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -55,7 +56,7 @@ class _AddFriendModalState extends ConsumerState<AddFriendModal>
             child: Row(
               children: [
                 IconButton(
-                  icon: Icon(Icons.settings_outlined, color: Colors.grey[400]),
+                  icon: Icon(AppIcons.settings, color: Colors.grey[400]),
                   onPressed: () {
                     // Settings action (placeholder)
                   },
@@ -68,7 +69,7 @@ class _AddFriendModalState extends ConsumerState<AddFriendModal>
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close),
+                  icon: const Icon(AppIcons.close),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -278,7 +279,7 @@ class _QrCodeTabState extends ConsumerState<_QrCodeTab> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.qr_code_scanner,
+                          AppIcons.qrScanner,
                           size: 20,
                           color: !_isMyQrMode
                               ? AppTheme.primaryColor
@@ -316,7 +317,7 @@ class _QrCodeTabState extends ConsumerState<_QrCodeTab> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
-                          Icons.qr_code_2,
+                          AppIcons.qrCode,
                           size: 20,
                           color: _isMyQrMode
                               ? AppTheme.primaryColor
@@ -386,17 +387,17 @@ class _QrCodeTabState extends ConsumerState<_QrCodeTab> {
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
               _buildActionButton(
-                icon: Icons.link,
+                icon: AppIcons.link,
                 label: 'คัดลอกลิงก์',
                 onTap: _copyLink,
               ),
               _buildActionButton(
-                icon: Icons.ios_share,
+                icon: AppIcons.share,
                 label: 'แชร์',
                 onTap: _shareQr,
               ),
               _buildActionButton(
-                icon: Icons.download,
+                icon: AppIcons.download,
                 label: 'บันทึก',
                 onTap: _saveQr,
               ),
@@ -449,7 +450,7 @@ class _QrCodeTabState extends ConsumerState<_QrCodeTab> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               const Icon(
-                                Icons.camera_alt_outlined,
+                                AppIcons.camera,
                                 size: 48,
                                 color: Colors.grey,
                               ),
@@ -567,7 +568,7 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
             controller: _searchController,
             decoration: InputDecoration(
               hintText: 'ค้นหาด้วยอีเมล',
-              prefixIcon: const Icon(Icons.search),
+              prefixIcon: const Icon(AppIcons.search),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -581,7 +582,7 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
                       ),
                     )
                   : IconButton(
-                      icon: const Icon(Icons.search),
+                      icon: const Icon(AppIcons.search),
                       onPressed: _search,
                     ),
             ),
@@ -607,7 +608,7 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.email_outlined, size: 64, color: Colors.grey[300]),
+            Icon(AppIcons.mail, size: 64, color: Colors.grey[300]),
             const SizedBox(height: 16),
             Text(
               'ค้นหาเพื่อนด้วยอีเมล',
@@ -623,7 +624,7 @@ class _SearchTabState extends ConsumerState<_SearchTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.person_off_outlined, size: 64, color: Colors.grey[300]),
+            Icon(AppIcons.personOff, size: 64, color: Colors.grey[300]),
             const SizedBox(height: 16),
             const Text('ไม่พบผู้ใช้', style: TextStyle(color: Colors.grey)),
             const SizedBox(height: 8),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/services/friend_service.dart';
@@ -95,7 +96,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.push('/groups/create'),
         backgroundColor: const Color(0xFF81CEF2),
-        icon: const Icon(Icons.add, color: Colors.white),
+        icon: const Icon(AppIcons.add, color: Colors.white),
         label: const Text(
           'สร้างกลุ่มใหม่',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
@@ -121,7 +122,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                 hintText: 'ค้นหาเพื่อน...',
                 hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
                 prefixIcon: Icon(
-                  Icons.search,
+                  AppIcons.search,
                   color: Colors.grey[400],
                   size: 20,
                 ),
@@ -144,7 +145,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
               borderRadius: BorderRadius.circular(22),
             ),
             child: const Icon(
-              Icons.person_add_alt_1,
+              AppIcons.personAdd,
               color: Colors.white,
               size: 22,
             ),
@@ -181,8 +182,8 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                   ),
                   Icon(
                     _requestsExpanded
-                        ? Icons.keyboard_arrow_up
-                        : Icons.keyboard_arrow_down,
+                        ? AppIcons.chevronUp
+                        : AppIcons.chevronDown,
                     color: Colors.grey[600],
                   ),
                 ],
@@ -215,7 +216,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
           onPressed: () {
             // TODO: Show filter options
           },
-          icon: Icon(Icons.tune, color: Colors.grey[600]),
+          icon: Icon(AppIcons.tune, color: Colors.grey[600]),
         ),
       ],
     );
@@ -252,7 +253,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
               padding: const EdgeInsets.all(40),
               child: Column(
                 children: [
-                  Icon(Icons.people_outline, size: 64, color: Colors.grey[300]),
+                  Icon(AppIcons.people, size: 64, color: Colors.grey[300]),
                   const SizedBox(height: 16),
                   const Text(
                     'ยังไม่มีเพื่อน',
@@ -275,7 +276,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
               padding: const EdgeInsets.all(40),
               child: Column(
                 children: [
-                  Icon(Icons.search_off, size: 48, color: Colors.grey[300]),
+                  Icon(AppIcons.searchOff, size: 48, color: Colors.grey[300]),
                   const SizedBox(height: 12),
                   const Text(
                     'ไม่พบเพื่อนที่ค้นหา',
@@ -388,7 +389,7 @@ class _FriendCard extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Icon(
-              Icons.notifications_outlined,
+              AppIcons.notifications,
               color: const Color(0xFF81CEF2),
               size: 24,
             ),

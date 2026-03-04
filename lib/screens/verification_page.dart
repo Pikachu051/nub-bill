@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/screens/home_page.dart';
@@ -193,7 +194,7 @@ class _VerificationPageState extends State<VerificationPage> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.close),
+          icon: const Icon(AppIcons.close),
           onPressed: () => Navigator.pop(context),
         ),
         elevation: 0,

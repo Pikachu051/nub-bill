@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nubbill/shared/app_icons.dart';
 
 /// Custom Navigation Bar matching the design prototype exactly
 /// - 4 items: กลุ่ม, เพื่อน, แจ้งเตือน, โปรไฟล์
@@ -23,7 +24,7 @@ class ScaffoldWithNavBar extends StatelessWidget {
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
+              color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
@@ -36,29 +37,29 @@ class ScaffoldWithNavBar extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _NavItem(
-                  icon: Icons.group_outlined,
-                  activeIcon: Icons.group,
+                  icon: AppIcons.groups,
+                  activeIcon: AppIcons.groups,
                   label: 'กลุ่ม',
                   isActive: currentIndex == 0,
                   onTap: () => _onTap(shell, 0),
                 ),
                 _NavItem(
-                  icon: Icons.person_outline,
-                  activeIcon: Icons.person,
+                  icon: AppIcons.friends,
+                  activeIcon: AppIcons.friends,
                   label: 'เพื่อน',
                   isActive: currentIndex == 1,
                   onTap: () => _onTap(shell, 1),
                 ),
                 _NavItem(
-                  icon: Icons.notifications_outlined,
-                  activeIcon: Icons.notifications,
+                  icon: AppIcons.notifications,
+                  activeIcon: AppIcons.notifications,
                   label: 'แจ้งเตือน',
                   isActive: currentIndex == 2,
                   onTap: () => _onTap(shell, 2),
                 ),
                 _NavItem(
-                  icon: Icons.person_outline,
-                  activeIcon: Icons.person,
+                  icon: AppIcons.profile,
+                  activeIcon: AppIcons.profile,
                   label: 'โปรไฟล์',
                   isActive: currentIndex == 3,
                   onTap: () => _onTap(shell, 3),

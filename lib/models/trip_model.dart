@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 
 /// Trip category enum matching backend
 enum TripCategory {
@@ -44,15 +45,15 @@ enum TripCategory {
   IconData get icon {
     switch (this) {
       case TripCategory.travel:
-        return Icons.flight;
+        return AppIcons.flight;
       case TripCategory.accommodation:
-        return Icons.hotel;
+        return AppIcons.hotel;
       case TripCategory.food:
-        return Icons.restaurant;
+        return AppIcons.restaurant;
       case TripCategory.romance:
-        return Icons.favorite;
+        return AppIcons.favorite;
       case TripCategory.other:
-        return Icons.category;
+        return AppIcons.category;
     }
   }
 

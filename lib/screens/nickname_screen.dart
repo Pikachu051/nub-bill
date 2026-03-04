@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/providers/auth_provider.dart';
@@ -83,7 +84,7 @@ class _NicknameScreenState extends ConsumerState<NicknameScreen> {
                     return null;
                   },
                   decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.person_outline),
+                    prefixIcon: const Icon(AppIcons.person),
                     label: const Text('ชื่อเล่น'),
                     hintText: 'เพื่อนๆ จะเห็นชื่อนี้',
                     border: OutlineInputBorder(

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/providers/auth_provider.dart';
@@ -107,7 +108,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(AppIcons.arrowBack),
           onPressed: () => context.pop(),
         ),
         title: const Text('กรอกรหัส OTP'),

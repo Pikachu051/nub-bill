@@ -39,23 +39,29 @@ class QrPaymentData {
 /// Slip verification result
 class SlipVerificationResult {
   final bool success;
+  final String status;
   final String? message;
-  final bool? isOverpaid;
-  final Map<String, dynamic>? slipData;
+  final double? paidAmount;
+  final double? remainingAmount;
+  final bool isDuplicate;
 
   SlipVerificationResult({
     required this.success,
+    required this.status,
     this.message,
-    this.isOverpaid,
-    this.slipData,
+    this.paidAmount,
+    this.remainingAmount,
+    this.isDuplicate = false,
   });
 
   factory SlipVerificationResult.fromJson(Map<String, dynamic> json) {
     return SlipVerificationResult(
       success: json['success'] as bool? ?? false,
+      status: json['status'] as String? ?? 'unreadable',
       message: json['message'] as String?,
-      isOverpaid: json['is_overpaid'] as bool?,
-      slipData: json['slip_data'] as Map<String, dynamic>?,
+      paidAmount: (json['paidAmount'] as num?)?.toDouble(),
+      remainingAmount: (json['remainingAmount'] as num?)?.toDouble(),
+      isDuplicate: json['isDuplicate'] as bool? ?? false,
     );
   }
 }
@@ -144,31 +150,34 @@ class PaymentService {
     return settlementId;
   }
 
-  /// POST /api/payment/verify-slip - Upload and verify payment slip
-  Future<SlipVerificationResult> verifySlip({
+  /// POST /api/payment/verify-slip - Verify parsed QR data (client-side extraction)
+  Future<SlipVerificationResult> verifySlipData({
     required String settlementId,
-    required List<int> slipBytes,
-    required String fileName,
+    required double amount,
+    required String receiverId,
+    required String transactionRef,
   }) async {
-    // Create multipart request for file upload
     final response = await _client.post(
       '/payment/verify-slip',
       body: {
         'settlement_id': settlementId,
-        // Note: Actual file upload would need multipart handling
-        // For now, we'll base64 encode the image
-        'slip_image': slipBytes,
-        'file_name': fileName,
+        'amount': amount,
+        'receiver_id': receiverId,
+        'transaction_ref': transactionRef,
       },
     );
+
+    if (response.data is Map<String, dynamic>) {
+      return SlipVerificationResult.fromJson(
+        response.data as Map<String, dynamic>,
+      );
+    }
 
     if (!response.isSuccess || response.data == null) {
       throw Exception(response.error ?? 'Failed to verify slip');
     }
 
-    return SlipVerificationResult.fromJson(
-      response.data as Map<String, dynamic>,
-    );
+    throw Exception('Invalid verification response');
   }
 
   /// GET /api/payment/settlements/:id - Get settlement status

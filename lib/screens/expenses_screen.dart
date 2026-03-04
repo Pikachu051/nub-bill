@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/services/auth_repository.dart';
@@ -77,7 +78,7 @@ class ExpensesScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.receipt_long, size: 64, color: Colors.grey[300]),
+                  Icon(AppIcons.receipt, size: 64, color: Colors.grey[300]),
                   const SizedBox(height: 16),
                   const Text(
                     'ยังไม่มีรายการค่าใช้จ่าย',
@@ -144,7 +145,7 @@ class _ExpenseCard extends StatelessWidget {
       child: ListTile(
         leading: CircleAvatar(
           backgroundColor: const Color(0xFF81CEF2).withValues(alpha: 0.1),
-          child: const Icon(Icons.receipt, color: Color(0xFF81CEF2)),
+          child: const Icon(AppIcons.receipt, color: Color(0xFF81CEF2)),
         ),
         title: Text(
           description,

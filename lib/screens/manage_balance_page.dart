@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nubbill/models/expense_model.dart';
 import 'package:nubbill/models/trip_member_model.dart';
@@ -149,7 +150,7 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
       centerTitle: true,
       leading: IconButton(
         icon: const Icon(
-          Icons.chevron_left,
+          AppIcons.chevronLeft,
           color: Color(0xFF5E5E5E),
           size: 26,
         ),
@@ -339,11 +340,7 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.account_balance_wallet_rounded,
-                  size: 56,
-                  color: Color(0xFF8ECFF0),
-                ),
+                const Icon(AppIcons.wallet, size: 56, color: Color(0xFF8ECFF0)),
                 const SizedBox(height: 10),
                 const Text(
                   'ได้รับเงินแล้วใช่มั้ย?',
@@ -511,7 +508,7 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
         desc.contains('มื้อ') ||
         desc.contains('restaurant')) {
       return const _BillVisual(
-        icon: Icons.restaurant,
+        icon: AppIcons.restaurant,
         background: Color(0xFFE4CA76),
       );
     }
@@ -521,7 +518,7 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
         desc.contains('เดินทาง') ||
         desc.contains('transport')) {
       return const _BillVisual(
-        icon: Icons.local_gas_station,
+        icon: AppIcons.localGasStation,
         background: Color(0xFFA9ADB2),
       );
     }
@@ -529,11 +526,14 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
         desc.contains('โรงแรม') ||
         desc.contains('hotel') ||
         desc.contains('พัก')) {
-      return const _BillVisual(icon: Icons.home, background: Color(0xFFE8B0D4));
+      return const _BillVisual(
+        icon: AppIcons.home,
+        background: Color(0xFFE8B0D4),
+      );
     }
 
     return const _BillVisual(
-      icon: Icons.receipt_long,
+      icon: AppIcons.receipt,
       background: Color(0xFFB3B9BE),
     );
   }
@@ -627,7 +627,7 @@ class _FriendSummaryRow extends StatelessWidget {
               ),
               if (isPayTab)
                 const Icon(
-                  Icons.chevron_right,
+                  AppIcons.chevronRight,
                   color: Color(0xFFB3B3B3),
                   size: 22,
                 )
@@ -636,7 +636,7 @@ class _FriendSummaryRow extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _CircleIconButton(
-                      icon: Icons.notifications,
+                      icon: AppIcons.notificationsActive,
                       onPressed: onRemind,
                       foregroundColor: const Color(0xFF81CEF2),
                       backgroundColor: Colors.transparent,
@@ -644,7 +644,9 @@ class _FriendSummaryRow extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     _CircleIconButton(
-                      icon: isVerifying ? Icons.hourglass_top : Icons.check,
+                      icon: isVerifying
+                          ? AppIcons.hourglassTop
+                          : AppIcons.check,
                       onPressed: isVerifying ? null : onManualVerify,
                       foregroundColor: Colors.white,
                       backgroundColor: const Color(0xFF38BF5E),

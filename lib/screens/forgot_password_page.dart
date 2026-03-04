@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nubbill/config/supabase_config.dart';
@@ -78,7 +79,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(AppIcons.arrowBack),
           onPressed: () => context.pop(),
         ),
         elevation: 0,
@@ -170,11 +171,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        const Icon(
-          Icons.mark_email_read_outlined,
-          size: 80,
-          color: Color(0xFF81CEF2),
-        ),
+        const Icon(AppIcons.mailCheck, size: 80, color: Color(0xFF81CEF2)),
         const SizedBox(height: 24),
         const Text(
           'ส่งอีเมลเรียบร้อยแล้ว!',

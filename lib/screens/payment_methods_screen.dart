@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/screens/payment_method_options.dart';
@@ -95,12 +96,12 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
               context.go('/profile');
             }
           },
-          icon: const Icon(Icons.chevron_left, size: 28),
+          icon: const Icon(AppIcons.chevronLeft, size: 28),
         ),
         actions: [
           IconButton(
             onPressed: _goToAddPage,
-            icon: const Icon(Icons.add, color: Color(0xFF81CEF2), size: 28),
+            icon: const Icon(AppIcons.add, color: Color(0xFF81CEF2), size: 28),
           ),
           const SizedBox(width: 6),
         ],
@@ -187,7 +188,7 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
         color: const Color(0xFFFFDDE0),
         borderRadius: BorderRadius.circular(14),
       ),
-      child: const Icon(Icons.delete_outline, color: Colors.red, size: 24),
+      child: const Icon(AppIcons.delete, color: Colors.red, size: 24),
     );
   }
 
@@ -198,11 +199,7 @@ class _PaymentMethodsScreenState extends ConsumerState<PaymentMethodsScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(
-              Icons.account_balance_wallet_outlined,
-              size: 64,
-              color: Color(0xFFB3B3B3),
-            ),
+            const Icon(AppIcons.wallet, size: 64, color: Color(0xFFB3B3B3)),
             const SizedBox(height: 12),
             const Text(
               'ยังไม่มีช่องทางรับเงิน',
@@ -314,7 +311,7 @@ class _PaymentMethodCard extends StatelessWidget {
                           child: const Padding(
                             padding: EdgeInsets.all(2),
                             child: Icon(
-                              Icons.edit,
+                              AppIcons.edit,
                               size: 14,
                               color: Color(0xFF8A8A8A),
                             ),
@@ -386,7 +383,7 @@ class _PaymentMethodCard extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
-                        Icons.check,
+                        AppIcons.check,
                         color: Colors.white,
                         size: 16,
                       ),
@@ -432,7 +429,7 @@ class _PaymentMethodCard extends StatelessWidget {
         color: Colors.white,
         shape: BoxShape.circle,
       ),
-      child: const Icon(Icons.account_balance, color: Color(0xFF6E7A86)),
+      child: const Icon(AppIcons.bank, color: Color(0xFF6E7A86)),
     );
   }
 
