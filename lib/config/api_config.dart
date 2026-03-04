@@ -3,14 +3,15 @@ library;
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io' show Platform;
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart' as http_parser;
 import 'package:nubbill/config/supabase_config.dart';
 
 /// API configuration constants
 class ApiConfig {
+  static const String _productionBaseUrl =
+      'https://nub-bill-backend.vercel.app';
+
   /// Base URL for the backend API.
   ///
   /// You can override at build/run time:
@@ -21,14 +22,7 @@ class ApiConfig {
       return override;
     }
 
-    if (kIsWeb) {
-      return 'http://10.0.24.2:3001';
-    }
-    // if (Platform.isAndroid) return 'http://10.0.2.2:3000'; // Android emulator
-    if (Platform.isAndroid) {
-      return 'http://10.0.24.2:3001'; // Wireless Debugging
-    }
-    return 'http://10.0.24.2:3001'; // iOS simulator / desktop
+    return _productionBaseUrl;
   }
 
   /// API prefix
