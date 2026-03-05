@@ -12,7 +12,7 @@ class SupabaseConfig {
 
   // Supabase anonymous key (safe to expose in client)
   static const String anonKey =
-      'sb_publishable_kkUfZhEd0UKICqGl3skU-g_vnvfbNOu';
+      'sb_publishable_PEr3ZERNSQejrUaUtD_XLQ_8R3uFO9Z';
 
   static bool _initialized = false;
   static Future<void>? _initializing;
