@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nubbill/config/api_config.dart';
+import 'package:nubbill/models/expense_category.dart';
 import 'package:nubbill/models/expense_model.dart';
 import 'package:nubbill/models/expense_detail_model.dart';
 import 'package:nubbill/services/auth_repository.dart';
@@ -55,6 +56,7 @@ class ExpenseService {
     required String description,
     required double amount,
     required String splitType,
+    required ExpenseCategory category,
     String? payerMemberId,
     DateTime? expenseDate,
     double? serviceChargePercent,
@@ -67,6 +69,7 @@ class ExpenseService {
     final body = <String, dynamic>{
       'description': description,
       'amount': amount,
+      'category': category.apiValue,
       'split_type': splitType,
     };
 
@@ -108,6 +111,7 @@ class ExpenseService {
     String expenseId, {
     String? description,
     double? amount,
+    ExpenseCategory? category,
     DateTime? expenseDate,
     String? splitType,
     String? payerMemberId,
@@ -122,6 +126,7 @@ class ExpenseService {
 
     if (description != null) body['description'] = description;
     if (amount != null) body['amount'] = amount;
+    if (category != null) body['category'] = category.apiValue;
     if (expenseDate != null) {
       body['expense_date'] = expenseDate.toIso8601String().split('T')[0];
     }

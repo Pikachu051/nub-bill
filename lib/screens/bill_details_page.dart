@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:nubbill/services/expense_service.dart';
-import 'package:nubbill/services/auth_repository.dart';
-import 'package:nubbill/models/expense_model.dart';
+import 'package:nubbill/models/expense_category.dart';
 import 'package:nubbill/models/expense_detail_model.dart';
+import 'package:nubbill/models/settlement_model.dart';
+import 'package:nubbill/services/auth_repository.dart';
+import 'package:nubbill/services/expense_service.dart';
+import 'package:nubbill/shared/app_icons.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
+import 'package:nubbill/widgets/settlement_detail_modal.dart';
 
 class BillDetailsPage extends ConsumerWidget {
   final String expenseId;
@@ -19,247 +21,209 @@ class BillDetailsPage extends ConsumerWidget {
     final currentUserId = ref.watch(authUserIdProvider);
 
     return expenseAsync.when(
-      loading: () => Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(AppIcons.arrowBack, color: Colors.black),
-            onPressed: () => context.pop(),
-          ),
-        ),
+      loading: () => _buildScaffold(
+        context,
         body: const Center(child: CircularProgressIndicator()),
       ),
-      error: (err, _) => Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(AppIcons.arrowBack, color: Colors.black),
-            onPressed: () => context.pop(),
-          ),
-        ),
+      error: (error, _) => _buildScaffold(
+        context,
         body: RetryErrorState(
-          error: err,
+          error: error,
           onRetry: () => ref.invalidate(expenseDetailProvider(expenseId)),
         ),
       ),
       data: (detail) {
         if (detail == null) {
-          return Scaffold(
-            appBar: AppBar(),
+          return _buildScaffold(
+            context,
             body: const Center(child: Text('ไม่พบข้อมูลบิล')),
           );
         }
 
         final canManageExpense =
             currentUserId != null && detail.createdBy == currentUserId;
+        final memberNameById = {
+          for (final split in detail.splits) split.memberId: split.displayName,
+        };
 
-        return _buildContent(context, ref, detail, canManageExpense);
+        return _buildScaffold(
+          context,
+          actions: canManageExpense
+              ? [
+                  IconButton(
+                    icon: const Icon(AppIcons.edit, color: Color(0xFF81CEF2)),
+                    onPressed: () async {
+                      final updated = await context.push<bool>(
+                        '/add_expense',
+                        extra: {
+                          'tripId': detail.tripId,
+                          'tripName': '',
+                          'expenseId': detail.id,
+                          'isEdit': true,
+                        },
+                      );
+
+                      if (updated == true && context.mounted) {
+                        ref.invalidate(expenseDetailProvider(expenseId));
+                        context.pop(true);
+                      }
+                    },
+                  ),
+                ]
+              : null,
+          body: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildHeaderCard(detail),
+                const SizedBox(height: 14),
+                if (detail.items.isNotEmpty) ...[
+                  _buildItemsSection(detail, memberNameById),
+                  const SizedBox(height: 14),
+                ],
+                _buildSplitSection(context, detail, currentUserId),
+                if (canManageExpense) ...[
+                  const SizedBox(height: 18),
+                  _buildDeleteButton(context, ref, detail),
+                ],
+              ],
+            ),
+          ),
+        );
       },
     );
   }
 
-  Widget _buildContent(
-    BuildContext context,
-    WidgetRef ref,
-    ExpenseDetail detail,
-    bool canManageExpense,
-  ) {
-    final date = DateTime.tryParse(detail.expenseDate) ?? DateTime.now();
-
-    // Reuse category heuristics from Expense model
-    final tempExpense = Expense(
-      id: detail.id,
-      tripId: detail.tripId,
-      payerId: detail.payerId,
-      amount: detail.amount,
-      description: detail.description,
-      expenseDate: detail.expenseDate,
-      createdBy: detail.createdBy,
-      createdAt: detail.createdAt,
-      updatedAt: detail.updatedAt,
-    );
-
+  Scaffold _buildScaffold(
+    BuildContext context, {
+    required Widget body,
+    List<Widget>? actions,
+  }) {
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFF2F6FB),
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(AppIcons.arrowBack, color: Colors.black),
+          icon: const Icon(AppIcons.arrowBack, color: Color(0xFF141416)),
           onPressed: () => context.pop(),
         ),
-        actions: canManageExpense
-            ? [
-                IconButton(
-                  icon: const Icon(AppIcons.edit, color: Color(0xFF81CEF2)),
-                  onPressed: () async {
-                    final updated = await context.push<bool>(
-                      '/add_expense',
-                      extra: {
-                        'tripId': detail.tripId,
-                        'tripName': '',
-                        'expenseId': detail.id,
-                        'isEdit': true,
-                      },
-                    );
-
-                    if (updated == true && context.mounted) {
-                      ref.invalidate(expenseDetailProvider(expenseId));
-                      context.pop(true);
-                    }
-                  },
-                ),
-              ]
-            : const [],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        child: Column(
-          children: [
-            const SizedBox(height: 8),
-            // Bill card
-            _buildBillCard(tempExpense, detail, date),
-            const SizedBox(height: 24),
-            // Section: "รายการแบ่งจ่าย"
-            _buildSectionTitle('รายการแบ่งจ่าย'),
-            const SizedBox(height: 12),
-            // Participant list
-            ...detail.splits.map((split) => _buildParticipantCard(split)),
-            if (canManageExpense) ...[
-              const SizedBox(height: 24),
-              // Delete button
-              _buildDeleteButton(context, ref, detail),
-            ],
-            const SizedBox(height: 32),
-          ],
+        centerTitle: true,
+        title: const Text(
+          'รายละเอียดบิล',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF141416),
+          ),
         ),
+        actions: actions,
       ),
+      body: body,
     );
   }
 
-  Widget _buildBillCard(
-    Expense tempExpense,
-    ExpenseDetail detail,
-    DateTime date,
-  ) {
-    final thaiMonths = [
-      '',
-      'มกราคม',
-      'กุมภาพันธ์',
-      'มีนาคม',
-      'เมษายน',
-      'พฤษภาคม',
-      'มิถุนายน',
-      'กรกฎาคม',
-      'สิงหาคม',
-      'กันยายน',
-      'ตุลาคม',
-      'พฤศจิกายน',
-      'ธันวาคม',
-    ];
-    final thaiYear = date.year + 543;
-    final dateText = '${date.day} ${thaiMonths[date.month]} $thaiYear';
+  Widget _buildHeaderCard(ExpenseDetail detail) {
+    final date = DateTime.tryParse(detail.expenseDate) ?? DateTime.now();
 
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Column(
         children: [
-          // Category icon
           Container(
-            width: 56,
-            height: 56,
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
-              color: tempExpense.categoryColor,
-              borderRadius: BorderRadius.circular(16),
+              color: detail.category.color,
+              borderRadius: BorderRadius.circular(18),
             ),
             child: Icon(
-              tempExpense.categoryIcon,
+              detail.category.icon,
+              color: const Color(0xFF141416),
               size: 28,
-              color: Colors.black54,
             ),
           ),
-          const SizedBox(height: 12),
-          // Title
+          const SizedBox(height: 10),
           Text(
             detail.description,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 19,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF141416),
+            ),
           ),
-          const SizedBox(height: 4),
-          // Date
+          const SizedBox(height: 2),
           Text(
-            dateText,
-            style: TextStyle(fontSize: 13, color: Colors.grey[500]),
+            _formatThaiDate(date),
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF7A8797),
+              fontWeight: FontWeight.w400,
+            ),
           ),
-          const SizedBox(height: 16),
-          // Total amount
+          const SizedBox(height: 8),
           Text(
             '${detail.amount.toStringAsFixed(2)}฿',
             style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF81CEF2),
+              fontSize: 30,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF141416),
             ),
           ),
-          const SizedBox(height: 12),
-          // Payer info
-          if (detail.payer != null)
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: const Color(
-                    0xFF81CEF2,
-                  ).withValues(alpha: 0.2),
-                  backgroundImage: detail.payer!.avatarUrl != null
-                      ? NetworkImage(detail.payer!.avatarUrl!)
-                      : null,
-                  child: detail.payer!.avatarUrl == null
-                      ? Text(
-                          detail.payer!.displayName.isNotEmpty
-                              ? detail.payer!.displayName[0].toUpperCase()
-                              : '?',
-                          style: const TextStyle(fontSize: 12),
-                        )
-                      : null,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'จ่ายโดย ${detail.payer!.displayName}',
-                  style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-                ),
-              ],
-            ),
           const SizedBox(height: 8),
-          // Split type label
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: const Color(0xFF81CEF2).withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              _getSplitTypeLabel(detail.splitType),
-              style: const TextStyle(
-                fontSize: 12,
-                color: Color(0xFF81CEF2),
-                fontWeight: FontWeight.w500,
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            alignment: WrapAlignment.center,
+            children: [
+              _headerTag(
+                detail.payer?.displayName ?? 'Unknown',
+                AppIcons.person,
               ),
+              _headerTag(
+                detail.isItemized ? 'แยกรายการ' : 'หารเท่ากัน',
+                detail.isItemized ? AppIcons.receipt : AppIcons.people,
+              ),
+              _headerTag(detail.category.label, detail.category.icon),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _headerTag(String value, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F7FC),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFE3EAF2)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: const Color(0xFF4E5D6E)),
+          const SizedBox(width: 5),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF4E5D6E),
             ),
           ),
         ],
@@ -267,109 +231,340 @@ class BillDetailsPage extends ConsumerWidget {
     );
   }
 
-  String _getSplitTypeLabel(String splitType) {
-    switch (splitType) {
-      case 'equal':
-        return 'แบ่งเท่ากัน';
-      case 'exact':
-        return 'แบ่งตามจำนวนเงิน';
-      case 'percent':
-        return 'แบ่งตามเปอร์เซ็นต์';
-      case 'itemized':
-        return 'แบ่งตามรายการ';
-      default:
-        return 'แบ่งเท่ากัน';
-    }
-  }
+  Widget _buildItemsSection(
+    ExpenseDetail detail,
+    Map<String, String> memberNameById,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'รายการย่อย',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF141416),
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...detail.items.map((item) {
+            final sharedNames = item.sharedByMemberIds
+                .map((id) => memberNameById[id] ?? 'สมาชิก')
+                .toList();
 
-  Widget _buildSectionTitle(String title) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Text(
-        title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            return Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F9FC),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE4EAF1)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.name,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF141416),
+                          ),
+                        ),
+                      ),
+                      Text(
+                        item.lineTotal.toStringAsFixed(2),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF141416),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    '${item.amount.toStringAsFixed(2)} x ${item.quantity}',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF7A8797),
+                      fontWeight: FontWeight.w400,
+                    ),
+                  ),
+                  if (sharedNames.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: sharedNames
+                          .map(
+                            (name) => Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: const Color(0xFFDCE4EE),
+                                ),
+                              ),
+                              child: Text(
+                                name,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF4E5D6E),
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          }),
+        ],
       ),
     );
   }
 
-  Widget _buildParticipantCard(ExpenseDetailSplit split) {
-    final isPaid = split.status == 'paid';
+  Widget _buildSplitSection(
+    BuildContext context,
+    ExpenseDetail detail,
+    String? currentUserId,
+  ) {
+    final isCurrentUserPrimaryPayer =
+        currentUserId != null && detail.payer?.userId == currentUserId;
+    final mySplits = currentUserId == null
+        ? const <ExpenseDetailSplit>[]
+        : detail.splits
+              .where((split) => split.memberUserId == currentUserId)
+              .toList();
+    final mySplit = mySplits.isEmpty ? null : mySplits.first;
+    final unpaidOthersTotal = detail.splits
+        .where(
+          (split) => split.memberId != detail.payerId && split.status != 'paid',
+        )
+        .fold<double>(0, (sum, split) => sum + split.amount);
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        child: Row(
-          children: [
-            // Avatar
-            CircleAvatar(
-              radius: 20,
-              backgroundColor: const Color(0xFF81CEF2).withValues(alpha: 0.2),
-              backgroundImage: split.memberAvatarUrl != null
-                  ? NetworkImage(split.memberAvatarUrl!)
-                  : null,
-              child: split.memberAvatarUrl == null
-                  ? Text(
-                      split.displayName.isNotEmpty
-                          ? split.displayName[0].toUpperCase()
-                          : '?',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    )
-                  : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'ผู้หารบิล',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF141416),
             ),
-            const SizedBox(width: 12),
-            // Name
-            Expanded(
-              child: Text(
-                split.displayName,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 15,
-                ),
-              ),
+          ),
+          const SizedBox(height: 8),
+          if (isCurrentUserPrimaryPayer &&
+              detail.payers.isEmpty &&
+              unpaidOthersTotal > 0) ...[
+            _buildSplitSummaryBanner(
+              label: 'คุณรอรับเงิน',
+              amount: unpaidOthersTotal,
+              textColor: const Color(0xFF1D4B64),
+              backgroundColor: const Color(0xFFEAF6FD),
             ),
-            // Amount & status
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            const SizedBox(height: 8),
+          ] else if (!isCurrentUserPrimaryPayer &&
+              mySplit != null &&
+              mySplit.status != 'paid') ...[
+            _buildSplitSummaryBanner(
+              label: 'คุณค้างจ่าย',
+              amount: mySplit.amount,
+              textColor: const Color(0xFFD32F2F),
+              backgroundColor: const Color(0xFFFDEBEC),
+            ),
+            const SizedBox(height: 8),
+          ],
+          ...detail.splits.map((split) {
+            final settlements = detail.settlementsForSplit(split.id);
+            return _buildSplitRow(context, detail, split, settlements);
+          }),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSplitSummaryBanner({
+    required String label,
+    required double amount,
+    required Color textColor,
+    required Color backgroundColor,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: textColor,
+            ),
+          ),
+          Text(
+            '${amount.toStringAsFixed(2)}฿',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: textColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSplitRow(
+    BuildContext context,
+    ExpenseDetail detail,
+    ExpenseDetailSplit split,
+    List<SettlementRecord> settlements,
+  ) {
+    final isPrimaryPayerShare =
+        detail.payers.isEmpty && split.memberId == detail.payerId;
+    final isPaid = split.status == 'paid' || isPrimaryPayerShare;
+    final statusLabel = isPrimaryPayerShare
+        ? 'คนจ่าย'
+        : (isPaid ? 'จ่ายแล้ว' : 'ค้างจ่าย');
+    final statusColor = isPrimaryPayerShare
+        ? const Color(0xFF81CEF2)
+        : (isPaid ? const Color(0xFF2E7D32) : const Color(0xFFD32F2F));
+    final statusBackground = isPrimaryPayerShare
+        ? const Color(0xFFEAF6FD)
+        : (isPaid ? const Color(0xFFE8F6EC) : const Color(0xFFFDEBEC));
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF7F9FC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFFE4EAF1)),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 17,
+            backgroundColor: const Color(0xFF81CEF2).withValues(alpha: 0.2),
+            backgroundImage: split.memberAvatarUrl != null
+                ? NetworkImage(split.memberAvatarUrl!)
+                : null,
+            child: split.memberAvatarUrl == null
+                ? Text(
+                    split.displayName.isNotEmpty
+                        ? split.displayName.substring(0, 1).toUpperCase()
+                        : '?',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${split.amount.toStringAsFixed(2)}฿',
+                  split.displayName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF141416),
                   ),
                 ),
                 const SizedBox(height: 2),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isPaid
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    isPaid ? 'จ่ายแล้ว' : 'ค้างจ่าย',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isPaid ? Colors.green[700] : Colors.red[700],
-                      fontWeight: FontWeight.w500,
-                    ),
+                Text(
+                  '${split.amount.toStringAsFixed(2)}฿',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF5D6D80),
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+          if (settlements.isNotEmpty)
+            IconButton(
+              tooltip: 'ดูบันทึกการโอน',
+              onPressed: () {
+                showSettlementHistorySheet(
+                  context,
+                  settlements: settlements,
+                  title: 'บันทึกการโอน',
+                );
+              },
+              icon: const Icon(
+                AppIcons.receipt,
+                color: Color(0xFF81CEF2),
+                size: 20,
+              ),
+            ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: statusBackground,
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              statusLabel,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: statusColor,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -384,17 +579,17 @@ class BillDetailsPage extends ConsumerWidget {
       child: OutlinedButton.icon(
         onPressed: () => _showDeleteDialog(context, ref, detail),
         style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.red,
-          side: const BorderSide(color: Colors.red),
-          padding: const EdgeInsets.symmetric(vertical: 14),
+          foregroundColor: const Color(0xFFEF5350),
+          side: const BorderSide(color: Color(0xFFEF5350)),
+          padding: const EdgeInsets.symmetric(vertical: 12),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(14),
           ),
         ),
         icon: const Icon(AppIcons.delete),
         label: const Text(
-          'ลบบิลนี้ชะ!',
-          style: TextStyle(fontWeight: FontWeight.bold),
+          'ลบบิลนี้',
+          style: TextStyle(fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -405,52 +600,75 @@ class BillDetailsPage extends ConsumerWidget {
     WidgetRef ref,
     ExpenseDetail detail,
   ) {
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text(
-          'ลบบิลนี้?',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          'คุณแน่ใจว่าต้องการลบ "${detail.description}" ?\nการกระทำนี้ไม่สามารถย้อนกลับได้',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('ยกเลิก'),
+      builder: (dialogContext) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext); // Close dialog
-              try {
-                await ref.read(expenseServiceProvider).deleteExpense(detail.id);
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('ลบบิลเรียบร้อยแล้ว')),
-                  );
-                  context.pop(true); // Return true to refresh parent
-                }
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(
-                    context,
-                  ).showSnackBar(SnackBar(content: Text('ลบไม่สำเร็จ: $e')));
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+          title: const Text(
+            'ลบบิลนี้?',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          content: Text(
+            'คุณแน่ใจว่าต้องการลบบิล "${detail.description}"\nการกระทำนี้ไม่สามารถย้อนกลับได้',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('ยกเลิก'),
             ),
-            child: const Text('ลบเลย'),
-          ),
-        ],
-      ),
+            ElevatedButton(
+              onPressed: () async {
+                Navigator.pop(dialogContext);
+                try {
+                  await ref
+                      .read(expenseServiceProvider)
+                      .deleteExpense(detail.id);
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('ลบบิลเรียบร้อยแล้ว')),
+                    );
+                    context.pop(true);
+                  }
+                } catch (error) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('ลบบิลไม่สำเร็จ: $error')),
+                    );
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFEF5350),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('ลบเลย'),
+            ),
+          ],
+        );
+      },
     );
+  }
+
+  String _formatThaiDate(DateTime date) {
+    const thaiMonths = [
+      '',
+      'ม.ค.',
+      'ก.พ.',
+      'มี.ค.',
+      'เม.ย.',
+      'พ.ค.',
+      'มิ.ย.',
+      'ก.ค.',
+      'ส.ค.',
+      'ก.ย.',
+      'ต.ค.',
+      'พ.ย.',
+      'ธ.ค.',
+    ];
+
+    return '${date.day} ${thaiMonths[date.month]} ${date.year + 543}';
   }
 }

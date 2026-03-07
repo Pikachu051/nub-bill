@@ -122,6 +122,8 @@ class NotificationService {
       'friend_request' || 'friend_accepted' => '/friends',
       'trip_invited' || 'trip_joined' =>
         tripId != null ? '/trips/$tripId' : '/home',
+      'manual_debtor_reminder' =>
+        tripId != null ? '/trips/$tripId' : '/friends',
       _ => '/notifications',
     };
   }

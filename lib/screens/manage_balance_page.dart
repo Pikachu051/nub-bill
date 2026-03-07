@@ -5,6 +5,7 @@ import 'package:nubbill/models/expense_model.dart';
 import 'package:nubbill/models/trip_member_model.dart';
 import 'package:nubbill/screens/friend_bills_page.dart';
 import 'package:nubbill/services/expense_service.dart';
+import 'package:nubbill/services/friend_service.dart';
 import 'package:nubbill/services/payment_service.dart';
 import 'package:nubbill/services/trip_service.dart';
 import 'package:nubbill/widgets/half_width_tab_indicator.dart';
@@ -241,14 +242,7 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
                       key: ValueKey('collect-${summary.memberId}'),
                       summary: summary,
                       isPayTab: false,
-                      onRemind: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('สะกิดเตือน ${summary.name} แล้ว'),
-                            behavior: SnackBarBehavior.floating,
-                          ),
-                        );
-                      },
+                      onRemind: () => _onRemindPressed(summary),
                       isVerifying: _manualVerifyingMembers.contains(
                         summary.memberId,
                       ),
@@ -327,6 +321,70 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
         });
       }
     }
+  }
+
+  Future<void> _onRemindPressed(_FriendDebtSummary summary) async {
+    final friendUserId = summary.userId;
+    if (friendUserId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ไม่สามารถแจ้งเตือนได้สำหรับสมาชิกที่ยังไม่ผูกบัญชี'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await _showRemindDialog(summary.name);
+    if (!confirmed || !mounted) return;
+
+    try {
+      await ref
+          .read(friendServiceProvider)
+          .sendPaymentReminder(friendUserId: friendUserId, tripId: widget.groupId);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('ส่งการแจ้งเตือนไปยัง ${summary.name} แล้ว'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('ส่งการแจ้งเตือนไม่สำเร็จ: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<bool> _showRemindDialog(String friendName) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.42),
+      builder: (context) {
+        return AlertDialog(
+          title: Text('จะเตือน $friendName ละน้า'),
+          content: Text('ระบบจะแจ้งเตือนไปยัง $friendName แล้วนะ'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('ยืนยัน'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
   }
 
   Future<bool> _showManualVerifyDialog(String friendName) async {

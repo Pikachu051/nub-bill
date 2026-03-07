@@ -37,10 +37,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
   }
 
-  String _getRouteFor(AppNotification n) {
-    final tripId = n.metadata?['trip_id'] as String?;
-    final expenseId = n.metadata?['expense_id'] as String?;
-    return switch (n.type) {
+  String _routeForNotification(AppNotification notification) {
+    final tripId = notification.metadata?['trip_id'] as String?;
+    final expenseId = notification.metadata?['expense_id'] as String?;
+    return switch (notification.type) {
       NotificationType.expenseCreated ||
       NotificationType.expenseUpdated ||
       NotificationType.expenseDeleted ||
@@ -52,17 +52,19 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       NotificationType.friendRequest || NotificationType.friendAccepted => '/friends',
       NotificationType.tripInvited || NotificationType.tripJoined =>
         tripId != null ? '/trips/$tripId' : '/home',
+      NotificationType.manualDebtorReminder =>
+        tripId != null ? '/trips/$tripId' : '/friends',
       NotificationType.unknown => '/notifications',
     };
   }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(notificationProvider);
-    final notifier = ref.read(notificationProvider.notifier);
+    final notificationState = ref.watch(notificationProvider);
+    final notificationNotifier = ref.read(notificationProvider.notifier);
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: const Color(0xFFFFFFFF),
       appBar: AppBar(
         title: const Text(
           'แจ้งเตือน',
@@ -75,9 +77,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         foregroundColor: Colors.black87,
         elevation: 0,
         actions: [
-          if (state.unreadCount > 0)
+          if (notificationState.unreadCount > 0)
             TextButton(
-              onPressed: notifier.markAllRead,
+              onPressed: notificationNotifier.markAllRead,
               child: const Text(
                 'อ่านทั้งหมด',
                 style: TextStyle(
@@ -89,19 +91,22 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: notifier.refresh,
+        onRefresh: notificationNotifier.refresh,
         color: const Color(0xFF81CEF2),
-        child: _buildBody(state, notifier),
+        child: _buildBody(notificationState, notificationNotifier),
       ),
     );
   }
 
-  Widget _buildBody(NotificationState state, NotificationNotifier notifier) {
-    if (state.isLoading && state.notifications.isEmpty) {
+  Widget _buildBody(
+    NotificationState notificationState,
+    NotificationNotifier notificationNotifier,
+  ) {
+    if (notificationState.isLoading && notificationState.notifications.isEmpty) {
       return const Center(child: CircularProgressIndicator(color: Color(0xFF81CEF2)));
     }
 
-    if (state.error != null && state.notifications.isEmpty) {
+    if (notificationState.error != null && notificationState.notifications.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -109,13 +114,13 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             Icon(Icons.cloud_off, size: 60, color: Colors.grey[300]),
             const SizedBox(height: 12),
             Text(
-              state.error!,
+              notificationState.error!,
               style: TextStyle(color: Colors.grey[500]),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: notifier.refresh,
+              onPressed: notificationNotifier.refresh,
               child: const Text('ลองอีกครั้ง'),
             ),
           ],
@@ -123,7 +128,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       );
     }
 
-    if (state.notifications.isEmpty) {
+    if (notificationState.notifications.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -152,14 +157,50 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
       );
     }
 
-    return ListView.separated(
+    final groupedByDate = _groupNotificationsByDate(notificationState.notifications);
+
+    return ListView(
       controller: _scrollController,
       physics: const AlwaysScrollableScrollPhysics(),
-      itemCount: state.notifications.length + (state.hasMore ? 1 : 0),
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        if (index >= state.notifications.length) {
-          return const Padding(
+      children: [
+        const SizedBox(height: 8),
+        for (final dateGroup in groupedByDate) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
+            child: Text(
+              _formatDateHeader(dateGroup.date),
+              style: const TextStyle(
+                fontFamily: 'LINESeedSansTH',
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: Color(0xB2141416),
+              ),
+            ),
+          ),
+          for (var index = 0; index < dateGroup.notifications.length; index++) ...[
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: NotificationTile(
+                notification: dateGroup.notifications[index],
+                onTap: () {
+                  final selectedNotification = dateGroup.notifications[index];
+                  if (!selectedNotification.isRead) {
+                    notificationNotifier.markRead(selectedNotification.id);
+                  }
+                  context.go(_routeForNotification(selectedNotification));
+                },
+                onDismiss: () {
+                  notificationNotifier.deleteNotification(
+                    dateGroup.notifications[index].id,
+                  );
+                },
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+        ],
+        if (notificationState.hasMore)
+          const Padding(
             padding: EdgeInsets.all(16),
             child: Center(
               child: CircularProgressIndicator(
@@ -167,22 +208,57 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 strokeWidth: 2,
               ),
             ),
-          );
-        }
-
-        final n = state.notifications[index];
-        return NotificationTile(
-          notification: n,
-          onTap: () {
-            if (!n.isRead) notifier.markRead(n.id);
-            context.go(_getRouteFor(n));
-          },
-          onDismiss: () {
-            // Optimistically remove; backend delete is fire-and-forget
-            notifier.markRead(n.id);
-          },
-        );
-      },
+          ),
+      ],
     );
   }
+
+  List<_NotificationDateGroup> _groupNotificationsByDate(
+    List<AppNotification> notifications,
+  ) {
+    final grouped = <DateTime, List<AppNotification>>{};
+
+    for (final notification in notifications) {
+      final date = DateTime(
+        notification.createdAt.year,
+        notification.createdAt.month,
+        notification.createdAt.day,
+      );
+      grouped.putIfAbsent(date, () => <AppNotification>[]).add(notification);
+    }
+
+    final sortedDates = grouped.keys.toList()
+      ..sort((a, b) => b.compareTo(a));
+
+    return sortedDates
+        .map((date) => _NotificationDateGroup(date, grouped[date]!))
+        .toList();
+  }
+
+  String _formatDateHeader(DateTime date) {
+    const monthNames = <String>[
+      'มกราคม',
+      'กุมภาพันธ์',
+      'มีนาคม',
+      'เมษายน',
+      'พฤษภาคม',
+      'มิถุนายน',
+      'กรกฎาคม',
+      'สิงหาคม',
+      'กันยายน',
+      'ตุลาคม',
+      'พฤศจิกายน',
+      'ธันวาคม',
+    ];
+
+    final buddhistYear = date.year + 543;
+    return '${date.day} ${monthNames[date.month - 1]} $buddhistYear';
+  }
+}
+
+class _NotificationDateGroup {
+  final DateTime date;
+  final List<AppNotification> notifications;
+
+  const _NotificationDateGroup(this.date, this.notifications);
 }

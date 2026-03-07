@@ -171,6 +171,40 @@ class NotificationNotifier extends StateNotifier<NotificationState> {
     } catch (_) {}
   }
 
+  Future<void> deleteNotification(String id) async {
+    AppNotification? target;
+    for (final notification in state.notifications) {
+      if (notification.id == id) {
+        target = notification;
+        break;
+      }
+    }
+    final wasUnread = target != null && !target.isRead;
+
+    // Optimistic UI update
+    final remaining = state.notifications.where((n) => n.id != id).toList();
+    state = state.copyWith(
+      notifications: remaining,
+      unreadCount: wasUnread ? (state.unreadCount - 1).clamp(0, 9999) : state.unreadCount,
+    );
+
+    try {
+      final response = await _client.delete('/notifications/$id');
+      if (!response.isSuccess) {
+        // Roll back if delete failed
+        state = state.copyWith(
+          notifications: [if (target != null) target, ...state.notifications],
+          unreadCount: wasUnread ? state.unreadCount + 1 : state.unreadCount,
+        );
+      }
+    } catch (_) {
+      state = state.copyWith(
+        notifications: [if (target != null) target, ...state.notifications],
+        unreadCount: wasUnread ? state.unreadCount + 1 : state.unreadCount,
+      );
+    }
+  }
+
   @override
   void dispose() {
     _channel?.unsubscribe();

@@ -1,10 +1,30 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nubbill/config/api_config.dart';
+import 'package:nubbill/models/settlement_model.dart';
+import 'package:nubbill/services/auth_repository.dart';
 
 /// Provider for PaymentService
 final paymentServiceProvider = Provider<PaymentService>((ref) {
   return PaymentService(ApiClient());
 });
+
+final tripSettlementsProvider = FutureProvider.autoDispose
+    .family<List<SettlementRecord>, String>((ref, tripId) async {
+      final userId = ref.watch(authUserIdProvider);
+      if (userId == null) return [];
+
+      final service = ref.read(paymentServiceProvider);
+      return service.getTripSettlements(tripId);
+    });
+
+final settlementDetailProvider = FutureProvider.autoDispose
+    .family<SettlementRecord?, String>((ref, settlementId) async {
+      final userId = ref.watch(authUserIdProvider);
+      if (userId == null) return null;
+
+      final service = ref.read(paymentServiceProvider);
+      return service.getSettlementStatus(settlementId);
+    });
 
 /// QR generation response
 class QrPaymentData {
@@ -196,14 +216,27 @@ class PaymentService {
   }
 
   /// GET /api/payment/settlements/:id - Get settlement status
-  Future<Map<String, dynamic>> getSettlementStatus(String settlementId) async {
+  Future<SettlementRecord> getSettlementStatus(String settlementId) async {
     final response = await _client.get('/payment/settlements/$settlementId');
 
     if (!response.isSuccess || response.data == null) {
       throw Exception(response.error ?? 'Failed to get settlement status');
     }
 
-    return response.data as Map<String, dynamic>;
+    return SettlementRecord.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<List<SettlementRecord>> getTripSettlements(String tripId) async {
+    final response = await _client.get('/payment/trips/$tripId/settlements');
+
+    if (!response.isSuccess || response.data == null) {
+      throw Exception(response.error ?? 'Failed to load settlements');
+    }
+
+    final data = response.data as List<dynamic>;
+    return data
+        .map((item) => SettlementRecord.fromJson(item as Map<String, dynamic>))
+        .toList();
   }
 
   /// POST /api/payment/manual-verify - Verify payment manually (without slip)

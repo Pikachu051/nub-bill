@@ -49,7 +49,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (maybeMembers is List<TripMember>) {
         members = maybeMembers;
       } else if (maybeMembers is List) {
-        members = maybeMembers.whereType<TripMember>().toList();
+        members = maybeMembers
+            .map((e) => e is TripMember
+                ? e
+                : TripMember.fromJson(e as Map<String, dynamic>))
+            .toList();
       }
     }
 
@@ -155,10 +159,21 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/add_expense',
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
+          final membersRaw = extra['members'];
+          List<TripMember>? members;
+          if (membersRaw is List<TripMember>) {
+            members = membersRaw;
+          } else if (membersRaw is List) {
+            members = membersRaw
+                .map((e) => e is TripMember
+                    ? e
+                    : TripMember.fromJson(e as Map<String, dynamic>))
+                .toList();
+          }
           return AddExpenseScreen(
             tripId: extra['tripId'] as String? ?? '',
             tripName: extra['tripName'] as String? ?? '',
-            members: extra['members'] as List<TripMember>?,
+            members: members,
             expenseId: extra['expenseId'] as String?,
             isEdit: extra['isEdit'] as bool? ?? false,
           );

@@ -310,13 +310,78 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   }
 }
 
-class _FriendCard extends StatelessWidget {
+class _FriendCard extends ConsumerStatefulWidget {
   final Friend friend;
 
   const _FriendCard({required this.friend});
 
   @override
+  ConsumerState<_FriendCard> createState() => _FriendCardState();
+}
+
+class _FriendCardState extends ConsumerState<_FriendCard> {
+  bool _isSendingReminder = false;
+
+  Future<void> _onPressRemind() async {
+    if (_isSendingReminder || widget.friend.balance <= 0) return;
+
+    final confirmed = await _showRemindDialog(widget.friend.nickname);
+    if (!confirmed || !mounted) return;
+
+    setState(() => _isSendingReminder = true);
+    try {
+      await ref
+          .read(friendServiceProvider)
+          .sendPaymentReminder(friendUserId: widget.friend.id);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('ส่งการแจ้งเตือนไปยัง ${widget.friend.nickname} แล้ว'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('ส่งการแจ้งเตือนไม่สำเร็จ: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSendingReminder = false);
+    }
+  }
+
+  Future<bool> _showRemindDialog(String friendName) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.42),
+      builder: (context) {
+        return AlertDialog(
+          title: Text('จะเตือน $friendName ละน้า'),
+          content: Text('ระบบจะแจ้งเตือนไปยัง $friendName แล้วนะ'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('ยืนยัน'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final friend = widget.friend;
     final isOwed = friend.balance > 0; // They owe you
 
     String balanceLabel;
@@ -389,10 +454,21 @@ class _FriendCard extends StatelessWidget {
               ],
             ),
             const SizedBox(width: 8),
-            Icon(
-              AppIcons.notifications,
-              color: const Color(0xFF81CEF2),
-              size: 24,
+            IconButton(
+              onPressed: isOwed ? _onPressRemind : null,
+              icon: _isSendingReminder
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Icon(
+                      AppIcons.notifications,
+                      color: isOwed
+                          ? const Color(0xFF81CEF2)
+                          : Colors.grey[350],
+                      size: 24,
+                    ),
             ),
           ],
         ),

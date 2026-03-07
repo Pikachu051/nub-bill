@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:nubbill/shared/app_icons.dart';
+import 'package:nubbill/models/expense_category.dart';
 
 /// Expense model matching the backend list response from GET /trips/:id/expenses
 class Expense {
@@ -8,8 +8,9 @@ class Expense {
   final String payerId;
   final double amount;
   final String description;
+  final ExpenseCategory category;
   final String expenseDate;
-  final String splitType; // equal, exact, percent
+  final String splitType; // equal, exact, percent, itemized
   final double serviceChargePercent;
   final double vatPercent;
   final String createdBy;
@@ -32,6 +33,7 @@ class Expense {
     required this.payerId,
     required this.amount,
     required this.description,
+    this.category = ExpenseCategory.bill,
     required this.expenseDate,
     this.splitType = 'equal',
     this.serviceChargePercent = 0,
@@ -46,64 +48,12 @@ class Expense {
   });
 
   /// Category icon based on description heuristics
-  IconData get categoryIcon {
-    final desc = description.toLowerCase();
-    if (desc.contains('อาหาร') ||
-        desc.contains('ข้าว') ||
-        desc.contains('กิน') ||
-        desc.contains('มื้อ') ||
-        desc.contains('restaurant') ||
-        desc.contains('แม็กโดนัล') ||
-        desc.contains('7-eleven')) {
-      return AppIcons.restaurant;
-    }
-    if (desc.contains('ที่พัก') ||
-        desc.contains('โรงแรม') ||
-        desc.contains('hotel') ||
-        desc.contains('พัก')) {
-      return AppIcons.hotel;
-    }
-    if (desc.contains('น้ำมัน') ||
-        desc.contains('ค่ารถ') ||
-        desc.contains('แท็กซี่') ||
-        desc.contains('เดินทาง') ||
-        desc.contains('transport')) {
-      return AppIcons.car;
-    }
-    if (desc.contains('เคลียร์') || desc.contains('clear')) {
-      return AppIcons.checkCircle;
-    }
-    return AppIcons.receipt;
-  }
+  IconData get categoryIcon => category.icon;
 
   /// Category color for the icon background
-  Color get categoryColor {
-    final desc = description.toLowerCase();
-    if (desc.contains('อาหาร') ||
-        desc.contains('ข้าว') ||
-        desc.contains('กิน') ||
-        desc.contains('มื้อ') ||
-        desc.contains('restaurant') ||
-        desc.contains('แม็กโดนัล') ||
-        desc.contains('7-eleven')) {
-      return const Color(0xFFFFF3E0); // warm orange bg
-    }
-    if (desc.contains('ที่พัก') ||
-        desc.contains('โรงแรม') ||
-        desc.contains('hotel') ||
-        desc.contains('พัก')) {
-      return const Color(0xFFFFEBEE); // red-ish bg
-    }
-    if (desc.contains('น้ำมัน') ||
-        desc.contains('ค่ารถ') ||
-        desc.contains('transport')) {
-      return const Color(0xFFE3F2FD); // blue bg
-    }
-    if (desc.contains('เคลียร์') || desc.contains('clear')) {
-      return const Color(0xFFE8F5E9); // green bg
-    }
-    return const Color(0xFFF3E5F5); // purple bg
-  }
+  Color get categoryColor => category.color;
+
+  bool get isItemized => splitType == 'itemized';
 
   factory Expense.fromJson(Map<String, dynamic> json) {
     // Parse payer nested object
@@ -129,6 +79,7 @@ class Expense {
       payerId: json['payer_id'] as String,
       amount: (json['amount'] as num).toDouble(),
       description: json['description'] as String? ?? '',
+      category: ExpenseCategoryX.fromApi(json['category'] as String?),
       expenseDate: json['expense_date'] as String? ?? '',
       splitType: json['split_type'] as String? ?? 'equal',
       serviceChargePercent:
@@ -151,6 +102,7 @@ class Expense {
       'payer_id': payerId,
       'amount': amount,
       'description': description,
+      'category': category.apiValue,
       'expense_date': expenseDate,
       'split_type': splitType,
       'service_charge_percent': serviceChargePercent,
@@ -234,12 +186,14 @@ class ExpenseSplitSummary {
   final String memberId;
   final double amount;
   final String status; // unpaid, pending, paid
+  final List<String> settlementIds;
 
   const ExpenseSplitSummary({
     required this.id,
     required this.memberId,
     required this.amount,
     required this.status,
+    this.settlementIds = const [],
   });
 
   factory ExpenseSplitSummary.fromJson(Map<String, dynamic> json) {
@@ -248,6 +202,9 @@ class ExpenseSplitSummary {
       memberId: json['member_id'] as String,
       amount: (json['amount'] as num).toDouble(),
       status: json['status'] as String? ?? 'unpaid',
+      settlementIds: ((json['settlement_ids'] as List<dynamic>?) ?? [])
+          .map((value) => value as String)
+          .toList(),
     );
   }
 }

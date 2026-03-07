@@ -5,15 +5,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/services/trip_service.dart';
 import 'package:nubbill/services/expense_service.dart';
+import 'package:nubbill/services/friend_service.dart';
+import 'package:nubbill/services/payment_service.dart';
 import 'package:nubbill/services/realtime_service.dart';
 import 'package:nubbill/models/trip_model.dart';
 import 'package:nubbill/models/trip_member_model.dart';
 import 'package:nubbill/models/expense_model.dart';
+import 'package:nubbill/models/settlement_model.dart';
 import 'package:nubbill/models/debt_entry_model.dart';
 import 'package:nubbill/models/balance_entry_model.dart';
 import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/widgets/half_width_tab_indicator.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
+import 'package:nubbill/widgets/settlement_detail_modal.dart';
 
 const _walletLoadTimeout = Duration(seconds: 12);
 
@@ -42,10 +46,12 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
 
   late TabController _tabController;
   StreamSubscription? _expenseSubscription;
+  StreamSubscription? _settlementSubscription;
   Timer? _walletRetryTimer;
 
   // Local state for bill list
   List<Expense> _expenses = [];
+  List<SettlementRecord> _settlements = [];
   bool _isInitialLoad = true;
 
   /// Current user's member ID in this trip
@@ -65,32 +71,46 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
   }
 
   Future<void> _loadInitialData() async {
-    // Load trip detail to get myMemberId
-    final tripDetail = await ref.read(
-      tripDetailProvider(widget.groupId).future,
-    );
-    if (mounted && tripDetail != null) {
-      final memberNames = <String, String>{};
-      for (final member in tripDetail.members) {
-        memberNames[member.id] = member.displayName;
+    try {
+      // Load trip detail to get myMemberId
+      final tripDetail = await ref.read(
+        tripDetailProvider(widget.groupId).future,
+      );
+      if (mounted && tripDetail != null) {
+        final memberNames = <String, String>{};
+        for (final member in tripDetail.members) {
+          memberNames[member.id] = member.displayName;
+        }
+        setState(() {
+          _myMemberId = tripDetail.myMemberId;
+          _memberNameById
+            ..clear()
+            ..addAll(memberNames);
+        });
       }
-      setState(() {
-        _myMemberId = tripDetail.myMemberId;
-        _memberNameById
-          ..clear()
-          ..addAll(memberNames);
-      });
-    }
 
-    // Load expenses
-    final expenses = await ref.read(
-      tripExpensesProvider(widget.groupId).future,
-    );
-    if (mounted) {
-      setState(() {
-        _expenses = List.from(expenses);
-        _isInitialLoad = false;
-      });
+      final expenses = await ref.read(
+        tripExpensesProvider(widget.groupId).future,
+      );
+      final settlements = await ref
+          .read(paymentServiceProvider)
+          .getTripSettlements(widget.groupId);
+
+      if (mounted) {
+        setState(() {
+          _expenses = List.from(expenses);
+          _settlements = settlements
+              .where((settlement) => settlement.isVerified)
+              .toList();
+          _isInitialLoad = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isInitialLoad = false;
+        });
+      }
     }
   }
 
@@ -114,6 +134,24 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
         ref.invalidate(tripBalancesWithTimeoutProvider(widget.groupId));
       },
     );
+
+    _settlementSubscription = realtimeService.subscribeToTripSettlements(
+      tripId: widget.groupId,
+      onEvent: (event) {
+        switch (event.type) {
+          case RealtimeEventType.insert:
+          case RealtimeEventType.update:
+          case RealtimeEventType.delete:
+            _reloadSettlements();
+            _reloadExpenses();
+            break;
+        }
+
+        ref.invalidate(tripDebtsProvider(widget.groupId));
+        ref.invalidate(tripBalancesProvider(widget.groupId));
+        ref.invalidate(tripBalancesWithTimeoutProvider(widget.groupId));
+      },
+    );
   }
 
   Future<void> _reloadExpenses() async {
@@ -129,10 +167,26 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     } catch (_) {}
   }
 
+  Future<void> _reloadSettlements() async {
+    try {
+      final settlements = await ref
+          .read(paymentServiceProvider)
+          .getTripSettlements(widget.groupId);
+      if (mounted) {
+        setState(() {
+          _settlements = settlements
+              .where((settlement) => settlement.isVerified)
+              .toList();
+        });
+      }
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _walletRetryTimer?.cancel();
     _expenseSubscription?.cancel();
+    _settlementSubscription?.cancel();
     _tabController.dispose();
     super.dispose();
   }
@@ -845,7 +899,8 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (_expenses.isEmpty) {
+    final entries = _buildFeedEntries();
+    if (entries.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -858,22 +913,24 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       );
     }
 
-    // Group expenses by date
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: _expenses.length,
+      itemCount: entries.length,
       itemBuilder: (context, index) {
-        final expense = _expenses[index];
+        final entry = entries[index];
 
-        // Show date header if first item or different date from previous
         Widget? dateHeader;
-        final currentDate = _parseExpenseDate(expense.expenseDate);
+        final currentDate = _entryDate(entry);
         if (index == 0) {
-          dateHeader = _buildDateHeader(currentDate, isFirstHeader: true);
+          dateHeader = _buildDateHeader(
+            currentDate,
+            isFirstHeader: true,
+            showFilter: true,
+          );
         } else {
-          final prevDate = _parseExpenseDate(_expenses[index - 1].expenseDate);
+          final prevDate = _entryDate(entries[index - 1]);
           if (!_isSameDay(currentDate, prevDate)) {
-            dateHeader = _buildDateHeader(currentDate);
+            dateHeader = _buildDateHeader(currentDate, showFilter: false);
           }
         }
 
@@ -881,23 +938,132 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (dateHeader != null) dateHeader,
-            _buildExpenseCard(expense),
+            if (entry.expense != null)
+              _buildExpenseCard(entry.expense!)
+            else if (entry.settlement != null)
+              _buildSettlementCard(entry.settlement!),
           ],
         );
       },
     );
   }
 
-  DateTime _parseExpenseDate(String dateStr) {
-    return DateTime.tryParse(dateStr) ?? DateTime.now();
+  List<_FeedEntry> _buildFeedEntries() {
+    final myMemberId = _myMemberId;
+
+    final entries = <_FeedEntry>[
+      ..._expenses.map(_FeedEntry.expense),
+      ..._settlements
+          .where((settlement) {
+            if (!settlement.isVerified) {
+              return false;
+            }
+            if (myMemberId == null) {
+              return true;
+            }
+            return settlement.payerMemberId == myMemberId ||
+                settlement.payeeMemberId == myMemberId;
+          })
+          .map(_FeedEntry.settlement),
+    ];
+
+    entries.sort((a, b) {
+      final byDate = _entrySortDate(b).compareTo(_entrySortDate(a));
+      if (byDate != 0) return byDate;
+
+      // Deterministic order when timestamps are equal.
+      return _entrySortKey(b).compareTo(_entrySortKey(a));
+    });
+    return entries;
+  }
+
+  DateTime _entrySortDate(_FeedEntry entry) {
+    if (entry.expense != null) {
+      return _expenseSortDate(entry.expense!);
+    }
+
+    final settlement = entry.settlement;
+    if (settlement == null) {
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+
+    return settlement.verifiedAt ??
+        DateTime.tryParse(settlement.createdAt) ??
+        DateTime.tryParse(settlement.updatedAt) ??
+        DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  String _entrySortKey(_FeedEntry entry) {
+    if (entry.expense != null) {
+      return 'expense_${entry.expense!.id}';
+    }
+    if (entry.settlement != null) {
+      return 'settlement_${entry.settlement!.id}';
+    }
+    return '';
+  }
+
+  DateTime _entryDate(_FeedEntry entry) {
+    if (entry.expense != null) {
+      return _expenseSortDate(entry.expense!);
+    }
+
+    final settlement = entry.settlement;
+    if (settlement == null) {
+      return DateTime.now();
+    }
+    return settlement.verifiedAt ??
+        DateTime.tryParse(settlement.createdAt) ??
+        DateTime.tryParse(settlement.updatedAt) ??
+        DateTime.now();
+  }
+
+  DateTime _expenseSortDate(Expense expense) {
+    final expenseDate = DateTime.tryParse(expense.expenseDate);
+    if (expenseDate == null) {
+      return DateTime.tryParse(expense.createdAt) ??
+          DateTime.tryParse(expense.updatedAt) ??
+          DateTime.now();
+    }
+
+    // If expense_date has no time component, use created_at time to order
+    // bills created on the same day.
+    final hasExplicitTime =
+        expenseDate.hour != 0 ||
+        expenseDate.minute != 0 ||
+        expenseDate.second != 0 ||
+        expenseDate.millisecond != 0 ||
+        expenseDate.microsecond != 0;
+    if (hasExplicitTime) {
+      return expenseDate;
+    }
+
+    final createdAt = DateTime.tryParse(expense.createdAt);
+    if (createdAt != null) {
+      return DateTime(
+        expenseDate.year,
+        expenseDate.month,
+        expenseDate.day,
+        createdAt.hour,
+        createdAt.minute,
+        createdAt.second,
+        createdAt.millisecond,
+        createdAt.microsecond,
+      );
+    }
+
+    return expenseDate;
   }
 
   bool _isSameDay(DateTime a, DateTime b) {
     return a.year == b.year && a.month == b.month && a.day == b.day;
   }
 
-  Widget _buildDateHeader(DateTime date, {bool isFirstHeader = false}) {
-    // Format Thai-style date
+  Widget _buildDateHeader(
+    DateTime date, {
+    bool isFirstHeader = false,
+    bool showFilter = false,
+  }) {
     final thaiMonths = [
       '',
       'มกราคม',
@@ -929,10 +1095,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
               color: Color(0xFF4A4A4A),
             ),
           ),
-          // Only show filter icon on the first date
-          if (dateText ==
-                  '${DateTime.now().day} ${thaiMonths[DateTime.now().month]} ${DateTime.now().year + 543}' ||
-              true) // Hardcoding for exact match placeholder
+          if (showFilter)
             Icon(AppIcons.tune, size: 20, color: const Color(0xFF4A4A4A)),
         ],
       ),
@@ -1056,40 +1219,42 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     }
 
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 10),
       elevation: 0,
-      color: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE8EDF3)),
+      ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
         onTap: () async {
           final result = await context.push('/expenses/${expense.id}');
           if (result == true) {
             _reloadExpenses();
             ref.invalidate(tripDebtsProvider(widget.groupId));
             ref.invalidate(tripExpensesProvider(widget.groupId));
+            _reloadSettlements();
           }
         },
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
           child: Row(
             children: [
-              // Category icon
               Container(
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
                   color: expense.categoryColor,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
                   expense.categoryIcon,
-                  size: 24,
-                  color: Colors.white,
+                  size: 22,
+                  color: const Color(0xFF141416),
                 ),
               ),
               const SizedBox(width: 12),
-              // Description & subtitle
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1097,8 +1262,8 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                     Text(
                       expense.description,
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
+                        fontWeight: FontWeight.normal,
+                        fontSize: 14,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1106,12 +1271,15 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                     const SizedBox(height: 2),
                     Text(
                       payerLabel,
-                      style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF7A8797),
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
                   ],
                 ),
               ),
-              // Status label
               _buildStatusLabel(
                 status,
                 userOweAmount,
@@ -1124,6 +1292,126 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
         ),
       ),
     );
+  }
+
+  Widget _buildSettlementCard(SettlementRecord settlement) {
+    final payerName =
+        settlement.payer?.displayName ??
+        _memberNameById[settlement.payerMemberId] ??
+        'สมาชิก';
+    final payeeName =
+        settlement.payee?.displayName ??
+        _memberNameById[settlement.payeeMemberId] ??
+        'สมาชิก';
+
+    final subtitle = _buildSettlementSubtitle(
+      settlement: settlement,
+      payerName: payerName,
+      payeeName: payeeName,
+    );
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      elevation: 0,
+      color: Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: Color(0xFFE8EDF3)),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () {
+          showSettlementHistorySheet(
+            context,
+            settlements: [settlement],
+            title: 'บันทึกการโอน',
+          );
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8F6EC),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  AppIcons.checkCircle,
+                  size: 22,
+                  color: Color(0xFF2E7D32),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'เคลียร์บิล',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                        color: Color(0xFF141416),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF7A8797),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${settlement.paidAmount.toStringAsFixed(2)}฿',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF2E7D32),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  const Text(
+                    'เคลียร์แล้ว',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF7A8797),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _buildSettlementSubtitle({
+    required SettlementRecord settlement,
+    required String payerName,
+    required String payeeName,
+  }) {
+    if (_myMemberId == settlement.payeeMemberId) {
+      return '$payerName เคลียร์หนี้กับคุณ';
+    }
+    if (_myMemberId == settlement.payerMemberId) {
+      return 'คุณเคลียร์หนี้กับ $payeeName';
+    }
+    return '$payerName เคลียร์หนี้กับ $payeeName';
   }
 
   String _buildPayerLabel(Expense expense) {
@@ -1440,10 +1728,16 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
               if (theyOweMe)
                 Padding(
                   padding: const EdgeInsets.only(left: 4),
-                  child: Icon(
-                    AppIcons.notificationsActive,
-                    size: 20,
-                    color: const Color(0xFF81CEF2),
+                  child: GestureDetector(
+                    onTap: () => _onRemindDebtorPressed(
+                      friendUserId: debt.fromUserId,
+                      friendName: debt.fromName,
+                    ),
+                    child: Icon(
+                      AppIcons.notificationsActive,
+                      size: 20,
+                      color: const Color(0xFF81CEF2),
+                    ),
                   ),
                 ),
             ],
@@ -1451,6 +1745,72 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
         ),
       ),
     );
+  }
+
+  Future<void> _onRemindDebtorPressed({
+    required String? friendUserId,
+    required String friendName,
+  }) async {
+    if (friendUserId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('ไม่สามารถแจ้งเตือนได้สำหรับสมาชิกที่ยังไม่ผูกบัญชี'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await _showRemindDialog(friendName);
+    if (!confirmed || !mounted) return;
+
+    try {
+      await ref
+          .read(friendServiceProvider)
+          .sendPaymentReminder(friendUserId: friendUserId, tripId: widget.groupId);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('ส่งการแจ้งเตือนไปยัง $friendName แล้ว'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('ส่งการแจ้งเตือนไม่สำเร็จ: $error'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
+
+  Future<bool> _showRemindDialog(String friendName) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.42),
+      builder: (context) {
+        return AlertDialog(
+          title: Text('จะเตือน $friendName ละน้า'),
+          content: Text('ระบบจะแจ้งเตือนไปยัง $friendName แล้วนะ'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('ยืนยัน'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
   }
 
   // =========================================================================
@@ -1524,6 +1884,21 @@ class _WalletState {
   });
 
   bool get hasBalanceData => netBalance != null;
+}
+
+class _FeedEntry {
+  final Expense? expense;
+  final SettlementRecord? settlement;
+
+  const _FeedEntry._({this.expense, this.settlement});
+
+  factory _FeedEntry.expense(Expense expense) {
+    return _FeedEntry._(expense: expense);
+  }
+
+  factory _FeedEntry.settlement(SettlementRecord settlement) {
+    return _FeedEntry._(settlement: settlement);
+  }
 }
 
 /// Bill status for current user

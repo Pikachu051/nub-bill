@@ -348,6 +348,25 @@ class FriendService {
         .eq('user_b', userB);
   }
 
+  /// Send manual payment reminder notification to a friend who owes me.
+  Future<void> sendPaymentReminder({
+    required String friendUserId,
+    String? message,
+    String? tripId,
+  }) async {
+    final response = await _api.post(
+      '/friends/$friendUserId/remind',
+      body: {
+        if (message != null && message.isNotEmpty) 'message': message,
+        if (tripId != null && tripId.isNotEmpty) 'trip_id': tripId,
+      },
+    );
+
+    if (!response.isSuccess) {
+      throw Exception(response.error ?? 'ไม่สามารถส่งการแจ้งเตือนได้');
+    }
+  }
+
   /// Send friend request by email
   Future<void> sendRequestByEmail(String email) async {
     final user = await _supabase

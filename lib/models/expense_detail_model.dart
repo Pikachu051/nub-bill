@@ -1,3 +1,6 @@
+import 'package:nubbill/models/expense_category.dart';
+import 'package:nubbill/models/settlement_model.dart';
+
 /// Detailed expense model for GET /expenses/:id response
 /// Includes payer profile, splits with member profiles, and expense items
 class ExpenseDetail {
@@ -6,6 +9,7 @@ class ExpenseDetail {
   final String payerId;
   final double amount;
   final String description;
+  final ExpenseCategory category;
   final String expenseDate;
   final String splitType;
   final double serviceChargePercent;
@@ -27,12 +31,16 @@ class ExpenseDetail {
   // Items (for itemized bills)
   final List<ExpenseDetailItem> items;
 
+  // Verified settlements linked to this expense's splits
+  final List<SettlementRecord> settlements;
+
   const ExpenseDetail({
     required this.id,
     required this.tripId,
     required this.payerId,
     required this.amount,
     required this.description,
+    this.category = ExpenseCategory.bill,
     required this.expenseDate,
     this.splitType = 'equal',
     this.serviceChargePercent = 0,
@@ -45,6 +53,7 @@ class ExpenseDetail {
     this.splits = const [],
     this.payers = const [],
     this.items = const [],
+    this.settlements = const [],
   });
 
   factory ExpenseDetail.fromJson(Map<String, dynamic> json) {
@@ -74,12 +83,18 @@ class ExpenseDetail {
         .map((i) => ExpenseDetailItem.fromJson(i as Map<String, dynamic>))
         .toList();
 
+    final settlementsJson = json['settlements'] as List<dynamic>? ?? [];
+    final settlements = settlementsJson
+        .map((item) => SettlementRecord.fromJson(item as Map<String, dynamic>))
+        .toList();
+
     return ExpenseDetail(
       id: json['id'] as String,
       tripId: json['trip_id'] as String,
       payerId: json['payer_id'] as String,
       amount: (json['amount'] as num).toDouble(),
       description: json['description'] as String? ?? '',
+      category: ExpenseCategoryX.fromApi(json['category'] as String?),
       expenseDate: json['expense_date'] as String? ?? '',
       splitType: json['split_type'] as String? ?? 'equal',
       serviceChargePercent:
@@ -93,7 +108,16 @@ class ExpenseDetail {
       splits: splits,
       payers: payers,
       items: items,
+      settlements: settlements,
     );
+  }
+
+  bool get isItemized => splitType == 'itemized';
+
+  List<SettlementRecord> settlementsForSplit(String splitId) {
+    return settlements.where((settlement) {
+      return settlement.referencesSplitId(splitId);
+    }).toList();
   }
 }
 
@@ -170,6 +194,7 @@ class ExpenseDetailSplit {
   final String memberId;
   final double amount;
   final String status; // unpaid, pending, paid
+  final List<String> settlementIds;
 
   // Member profile info
   final String? memberName;
@@ -182,6 +207,7 @@ class ExpenseDetailSplit {
     required this.memberId,
     required this.amount,
     required this.status,
+    this.settlementIds = const [],
     this.memberName,
     this.memberAvatarUrl,
     this.memberUserId,
@@ -200,6 +226,9 @@ class ExpenseDetailSplit {
       memberId: json['member_id'] as String,
       amount: (json['amount'] as num).toDouble(),
       status: json['status'] as String? ?? 'unpaid',
+        settlementIds: ((json['settlement_ids'] as List<dynamic>?) ?? [])
+          .map((value) => value as String)
+          .toList(),
       memberName: profiles?['nickname'] as String?,
       memberAvatarUrl: profiles?['avatar_url'] as String?,
       memberUserId: member?['user_id'] as String?,
@@ -223,6 +252,8 @@ class ExpenseDetailItem {
     this.quantity = 1,
     this.sharedByMemberIds = const [],
   });
+
+  double get lineTotal => amount * quantity;
 
   factory ExpenseDetailItem.fromJson(Map<String, dynamic> json) {
     // Parse shared-by member IDs

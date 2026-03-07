@@ -209,6 +209,14 @@ class HomePage extends ConsumerWidget {
 
     final tripsAsync = ref.watch(userTripsProvider);
     final walletAsync = ref.watch(walletSummaryProvider);
+    const baseWalletTop = 130.0;
+    const baseOverlapSpacer = 130.0;
+    const baselineTopInset = 24.0;
+    final topInset = MediaQuery.paddingOf(context).top;
+    // Keep phone layout as baseline and push card/spacer down only on taller insets.
+    final extraTopInset = (topInset - baselineTopInset).clamp(0.0, 48.0).toDouble();
+    final walletTop = baseWalletTop + extraTopInset;
+    final walletOverlapSpacer = baseOverlapSpacer + extraTopInset;
 
     return Scaffold(
       backgroundColor: Colors.grey[50],
@@ -298,7 +306,7 @@ class HomePage extends ConsumerWidget {
                   Positioned(
                     left: 16,
                     right: 16,
-                    top: 130,
+                    top: walletTop,
                     child: _buildWalletCard(walletAsync),
                   ),
                 ],
@@ -306,7 +314,7 @@ class HomePage extends ConsumerWidget {
 
               // Spacing for the overlapping card (wallet card is ~160px tall, positioned at 130, blue header is 180)
               // Card extends from 130 to ~290, so we need 290 - 180 = 110 spacing
-              const SizedBox(height: 130),
+              SizedBox(height: walletOverlapSpacer),
 
               // Groups section
               Padding(
@@ -572,9 +580,12 @@ class HomePage extends ConsumerWidget {
     final statusLabel = isPositive
         ? 'รอรับเงิน'
         : (isNegative ? 'ค้างจ่าย' : 'เคลียร์');
+    final statusColor = isPositive
+      ? const Color(0xFF4CAF50)
+      : (isNegative ? const Color(0xFFFF5252) : Colors.grey[500]);
     final amountColor = isPositive
-        ? const Color(0xFF81CEF2)
-        : (isNegative ? Colors.red[400] : Colors.grey[500]);
+      ? const Color(0xFF81CEF2)
+      : (isNegative ? const Color(0xFFFF5252) : Colors.grey[500]);
 
     return Card(
       elevation: 0,
@@ -604,14 +615,18 @@ class HomePage extends ConsumerWidget {
           children: [
             Text(
               statusLabel,
-              style: TextStyle(color: Colors.grey[500], fontSize: 12),
+              style: TextStyle(
+                color: statusColor,
+                fontSize: 12,
+                fontWeight: FontWeight.normal,
+              ),
             ),
             const SizedBox(height: 2),
             Text(
               '${_formatMoney(balance.abs())}฿',
               style: TextStyle(
                 color: amountColor,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.normal,
                 fontSize: 14,
               ),
             ),
