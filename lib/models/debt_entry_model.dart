@@ -10,6 +10,8 @@ class DebtEntry {
   final String? toAvatarUrl;
   final String? toUserId;
   final double amount;
+  final List<String> expenseSplitIds;
+  final List<String> counterExpenseSplitIds;
 
   const DebtEntry({
     required this.fromMemberId,
@@ -21,6 +23,8 @@ class DebtEntry {
     this.toAvatarUrl,
     this.toUserId,
     required this.amount,
+    this.expenseSplitIds = const [],
+    this.counterExpenseSplitIds = const [],
   });
 
   factory DebtEntry.fromJson(Map<String, dynamic> json) {
@@ -34,6 +38,8 @@ class DebtEntry {
       toAvatarUrl: json['to_avatar_url'] as String?,
       toUserId: json['to_user_id'] as String?,
       amount: (json['amount'] as num).toDouble(),
+      expenseSplitIds: (json['expense_split_ids'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      counterExpenseSplitIds: (json['counter_expense_split_ids'] as List?)?.map((e) => e.toString()).toList() ?? [],
     );
   }
 }

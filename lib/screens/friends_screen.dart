@@ -94,6 +94,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'friendsCreateGroupFab',
         onPressed: () => context.push('/groups/create'),
         backgroundColor: const Color(0xFF81CEF2),
         icon: const Icon(AppIcons.add, color: Colors.white),

@@ -4,6 +4,7 @@ import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/config/router.dart';
 import 'package:nubbill/config/theme.dart';
 import 'package:nubbill/services/deep_link_service.dart';
+import 'package:nubbill/services/notification_service.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
 
 final supabaseBootstrapProvider = FutureProvider<void>((ref) async {
@@ -19,6 +20,7 @@ class App extends ConsumerStatefulWidget {
 
 class _AppState extends ConsumerState<App> {
   bool _deepLinkInitialized = false;
+  bool _notificationInitialized = false;
 
   @override
   void dispose() {
@@ -58,6 +60,14 @@ class _AppState extends ConsumerState<App> {
             if (!mounted || _deepLinkInitialized) return;
             ref.read(deepLinkServiceProvider).initialize(context);
             setState(() => _deepLinkInitialized = true);
+          });
+        }
+
+        if (!_notificationInitialized) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || _notificationInitialized) return;
+            NotificationService.initialize().catchError((_) {});
+            setState(() => _notificationInitialized = true);
           });
         }
 

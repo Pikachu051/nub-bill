@@ -57,7 +57,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         final detail = await ref
             .read(tripServiceProvider)
             .getTripDetail(widget.tripId!);
-        members = detail.members;
+        members = detail?.members ?? const <TripMember>[];
       }
 
       _initializeMembers(members);

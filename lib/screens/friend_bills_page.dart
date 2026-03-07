@@ -26,14 +26,18 @@ class FriendBillsPage extends StatefulWidget {
   final String groupId;
   final String friendName;
   final String friendMemberId;
+  final String? friendAvatarUrl;
   final List<FriendBillItem> bills;
+  final List<String> counterSplitIds;
 
   const FriendBillsPage({
     super.key,
     required this.groupId,
     required this.friendName,
     required this.friendMemberId,
+    this.friendAvatarUrl,
     required this.bills,
+    this.counterSplitIds = const [],
   });
 
   @override
@@ -85,20 +89,28 @@ class _FriendBillsPageState extends State<FriendBillsPage> {
     });
   }
 
-  void _scanToPay() {
+  Future<void> _scanToPay() async {
     if (_selectedSplitIds.isEmpty) {
       return;
     }
 
-    context.push(
+    final result = await context.push<bool?>(
       '/payment',
       extra: {
         'amount': _selectedTotal,
         'memberId': widget.friendMemberId,
         'tripId': widget.groupId,
+        'payeeName': widget.friendName,
+        'payeeAvatarUrl': widget.friendAvatarUrl,
         'expenseSplitIds': _selectedSplitIds.toList(),
+        if (_allSelected && widget.counterSplitIds.isNotEmpty)
+          'counterExpenseSplitIds': widget.counterSplitIds,
       },
     );
+
+    if (result == true && mounted) {
+      Navigator.of(context).pop(true);
+    }
   }
 
   @override

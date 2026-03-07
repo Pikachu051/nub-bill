@@ -130,11 +130,24 @@ class TripService {
   }
 
   /// GET /api/trips/:id - Get trip details with members
-  Future<TripDetailResponse> getTripDetail(String tripId) async {
+  Future<TripDetailResponse?> getTripDetail(String tripId) async {
     final response = await _client.get('/trips/$tripId');
 
+    if (response.statusCode == 404) {
+      return null;
+    }
+
     if (!response.isSuccess || response.data == null) {
-      throw Exception(response.error ?? 'Failed to load trip details');
+      final status = response.statusCode;
+      final message = response.error;
+      if (message != null && message.isNotEmpty) {
+        throw Exception(message);
+      }
+      throw Exception(
+        status != null
+            ? 'Failed to load trip details (HTTP $status)'
+            : 'Failed to load trip details',
+      );
     }
 
     return TripDetailResponse.fromJson(response.data as Map<String, dynamic>);

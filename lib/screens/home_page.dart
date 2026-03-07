@@ -18,7 +18,8 @@ final userTripsProvider = FutureProvider.autoDispose<List<Trip>>((ref) async {
     final response = await SupabaseConfig.client
         .from('trip_members')
         .select('id, trip_id, role, trip:trips(*)')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .timeout(const Duration(seconds: 15));
 
     final trips = <Trip>[];
     final memberIdToTripId = <String, String>{};
@@ -129,7 +130,8 @@ final walletSummaryProvider = FutureProvider.autoDispose<Map<String, double>>((
     final memberResponse = await SupabaseConfig.client
         .from('trip_members')
         .select('id')
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .timeout(const Duration(seconds: 15));
 
     final memberIds = (memberResponse as List)
         .map((m) => m['id'] as String)

@@ -331,7 +331,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         _buildSettingItem(
           icon: AppIcons.creditCard,
           title: 'จัดการบัญชี / พร้อมเพย์',
-          onTap: () => context.push('/payment-methods'),
+          onTap: () => context.push('/profile/payment-methods'),
         ),
 
         const Divider(),
@@ -400,7 +400,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             ),
           ),
           TextButton(
-            onPressed: () => context.push('/payment-methods'),
+            onPressed: () => context.push('/profile/payment-methods'),
             child: const Text(
               'เพิ่มเลย',
               style: TextStyle(
@@ -433,7 +433,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       await prefs.setBool(key, true);
       if (!mounted) return;
 
-      context.push('/payment-methods');
+      context.push('/profile/payment-methods');
     });
   }
 

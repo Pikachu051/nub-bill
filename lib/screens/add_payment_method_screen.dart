@@ -84,7 +84,7 @@ class _AddPaymentMethodScreenState
               if (context.canPop()) {
                 context.pop();
               } else {
-                context.go('/payment-methods');
+                context.go('/profile/payment-methods');
               }
             },
             icon: const Icon(
@@ -639,7 +639,7 @@ class _AddPaymentMethodScreenState
       if (context.canPop()) {
         context.pop(true);
       } else {
-        context.go('/payment-methods');
+        context.go('/profile/payment-methods');
       }
     } catch (e) {
       if (!mounted) return;

@@ -70,6 +70,7 @@ class GroupsScreen extends ConsumerWidget {
         loading: () => const Center(child: CircularProgressIndicator()),
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'groupsAddFab',
         onPressed: () => context.push('/groups/create'),
         backgroundColor: const Color(0xFF81CEF2),
         child: const Icon(AppIcons.add, color: Colors.white),

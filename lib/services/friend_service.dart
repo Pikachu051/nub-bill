@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:nubbill/config/api_config.dart';
 import 'package:nubbill/services/auth_repository.dart';
 
 /// Provider for FriendService
@@ -153,74 +154,31 @@ class UserSearchResult {
 /// References profiles table (not users)
 class FriendService {
   final SupabaseClient _supabase;
+  final _api = ApiClient();
 
   FriendService(this._supabase);
 
   String get _userId => _supabase.auth.currentUser!.id;
 
-  /// Get list of friends with balances
+  /// Get list of friends with real balances from backend
   Future<List<Friend>> getFriends() async {
-    // Get all accepted friendships where current user is user_a or user_b
-    final friendships = await _supabase
-        .from('friendships')
-        .select('id, user_a, user_b, status, initiated_by')
-        .or('user_a.eq.$_userId,user_b.eq.$_userId')
-        .eq('status', 'accepted');
+    final response = await _api.get('/friends');
 
-    final List<Friend> friends = [];
-
-    for (final f in friendships) {
-      // Determine who is the friend (the other person)
-      final friendId = f['user_a'] == _userId ? f['user_b'] : f['user_a'];
-
-      // Get friend's profile
-      final profile = await _supabase
-          .from('profiles')
-          .select('id, nickname, email, avatar_url')
-          .eq('id', friendId)
-          .maybeSingle();
-
-      if (profile != null) {
-        // Count shared trips
-        final sharedTrips = await _countSharedTrips(friendId);
-
-        friends.add(
-          Friend(
-            id: friendId,
-            nickname: profile['nickname'] ?? 'Unknown',
-            email: profile['email'],
-            avatarUrl: profile['avatar_url'],
-            balance: 0, // Simplified - would need expense calculations
-            sharedTripsCount: sharedTrips,
-          ),
-        );
-      }
+    if (!response.isSuccess) {
+      throw Exception(response.error ?? 'Failed to load friends');
     }
 
-    return friends;
-  }
-
-  Future<int> _countSharedTrips(String friendId) async {
-    try {
-      final myTrips = await _supabase
-          .from('trip_members')
-          .select('trip_id')
-          .eq('user_id', _userId);
-
-      final myTripIds = (myTrips as List).map((t) => t['trip_id']).toList();
-
-      if (myTripIds.isEmpty) return 0;
-
-      final sharedTrips = await _supabase
-          .from('trip_members')
-          .select('trip_id')
-          .eq('user_id', friendId)
-          .inFilter('trip_id', myTripIds);
-
-      return (sharedTrips as List).length;
-    } catch (_) {
-      return 0;
-    }
+    final data = response.data as List;
+    return data.map((item) {
+      return Friend(
+        id: item['id'] as String,
+        nickname: item['nickname'] as String? ?? 'Unknown',
+        email: item['email'] as String?,
+        avatarUrl: item['avatar_url'] as String?,
+        balance: (item['balance'] as num?)?.toDouble() ?? 0.0,
+        sharedTripsCount: (item['sharedTripsCount'] as num?)?.toInt() ?? 0,
+      );
+    }).toList();
   }
 
   /// Get pending friend requests

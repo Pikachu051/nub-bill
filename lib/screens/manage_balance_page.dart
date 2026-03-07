@@ -187,17 +187,22 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
                       key: ValueKey('owe-${summary.memberId}'),
                       summary: summary,
                       isPayTab: true,
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
+                      onTap: () async {
+                        await Navigator.of(context).push(
+                          MaterialPageRoute<bool>(
                             builder: (_) => FriendBillsPage(
                               groupId: widget.groupId,
                               friendName: summary.name,
                               friendMemberId: summary.memberId,
+                              friendAvatarUrl: summary.avatarUrl,
                               bills: summary.bills,
+                              counterSplitIds: summary.counterSplitIds,
                             ),
                           ),
                         );
+                        ref.invalidate(tripExpensesProvider(widget.groupId));
+                        ref.invalidate(tripDebtsProvider(widget.groupId));
+                        ref.invalidate(tripBalancesProvider(widget.groupId));
                       },
                     );
                   },
@@ -474,10 +479,50 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
       }
     }
 
+    // Net debts between the same two people.
+    // If I owe friend X and friend X also owes me, cancel out the smaller side.
+    final allFriendIds = <String>{
+      ...oweMap.keys,
+      ...collectMap.keys,
+    };
+
+    // Track split IDs from cancelled counter-obligations so they can be
+    // marked paid together with the forward splits.
+    final counterSplitsByFriend = <String, List<String>>{};
+
+    for (final friendId in allFriendIds) {
+      final oweAcc = oweMap[friendId];
+      final collectAcc = collectMap[friendId];
+      if (oweAcc == null || collectAcc == null) continue;
+
+      final oweTotal = oweAcc.totalAmount;
+      final collectTotal = collectAcc.totalAmount;
+
+      if ((oweTotal - collectTotal).abs() < 0.005) {
+        // Exactly cancel — remove both
+        oweMap.remove(friendId);
+        collectMap.remove(friendId);
+      } else if (oweTotal > collectTotal) {
+        // I still owe net: remove from collect; reduce owe bills greedily
+        counterSplitsByFriend[friendId] = collectAcc.allSplitIds;
+        collectMap.remove(friendId);
+        oweMap[friendId] = oweAcc.subtractAmount(collectTotal);
+      } else {
+        // Friend still owes me net: remove from owe; reduce collect bills greedily
+        oweMap.remove(friendId);
+        collectMap[friendId] = collectAcc.subtractAmount(oweTotal);
+      }
+    }
+
     List<_FriendDebtSummary> toSortedList(
-      Map<String, _FriendDebtAccumulator> source,
-    ) {
-      final list = source.values.map((value) => value.toSummary()).toList();
+      Map<String, _FriendDebtAccumulator> source, {
+      Map<String, List<String>>? counterSplits,
+    }) {
+      final list = source.entries.map((entry) {
+        return entry.value.toSummary(
+          counterSplitIds: counterSplits?[entry.key] ?? [],
+        );
+      }).toList();
       list.sort((a, b) {
         final amountCompare = b.totalAmount.compareTo(a.totalAmount);
         if (amountCompare != 0) return amountCompare;
@@ -487,7 +532,7 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
     }
 
     return _GroupedSummaries(
-      oweSummaries: toSortedList(oweMap),
+      oweSummaries: toSortedList(oweMap, counterSplits: counterSplitsByFriend),
       collectSummaries: toSortedList(collectMap),
     );
   }
@@ -802,6 +847,7 @@ class _FriendDebtSummary {
   final String? userId;
   final List<FriendBillItem> bills;
   final double totalAmount;
+  final List<String> counterSplitIds;
 
   const _FriendDebtSummary({
     required this.memberId,
@@ -810,6 +856,7 @@ class _FriendDebtSummary {
     required this.userId,
     required this.bills,
     required this.totalAmount,
+    this.counterSplitIds = const [],
   });
 
   int get billCount => bills.length;
@@ -823,6 +870,10 @@ class _FriendDebtAccumulator {
   final List<FriendBillItem> _bills = [];
   double _totalAmount = 0;
 
+  double get totalAmount => _totalAmount;
+
+  List<String> get allSplitIds => _bills.map((b) => b.splitId).toList();
+
   _FriendDebtAccumulator({
     required this.memberId,
     required this.name,
@@ -835,7 +886,46 @@ class _FriendDebtAccumulator {
     _totalAmount += bill.amount;
   }
 
-  _FriendDebtSummary toSummary() {
+  /// Returns a new accumulator with bills reduced by [subtractAmount].
+  /// Bills are removed from smallest-first until the amount is cancelled.
+  _FriendDebtAccumulator subtractAmount(double subtractAmount) {
+    final result = _FriendDebtAccumulator(
+      memberId: memberId,
+      name: name,
+      avatarUrl: avatarUrl,
+      userId: userId,
+    );
+
+    // Sort bills smallest first so we cancel the most bills possible
+    final sorted = [..._bills]..sort((a, b) => a.amount.compareTo(b.amount));
+    double remaining = subtractAmount;
+
+    for (final bill in sorted) {
+      if (remaining <= 0) {
+        result.addBill(bill);
+      } else if (bill.amount <= remaining + 0.005) {
+        // This bill is fully covered by the netting — drop it
+        remaining -= bill.amount;
+      } else {
+        // Partially covered — keep with reduced amount
+        final reduced = FriendBillItem(
+          splitId: bill.splitId,
+          expenseId: bill.expenseId,
+          title: bill.title,
+          date: bill.date,
+          amount: bill.amount - remaining,
+          icon: bill.icon,
+          iconBackground: bill.iconBackground,
+        );
+        result.addBill(reduced);
+        remaining = 0;
+      }
+    }
+
+    return result;
+  }
+
+  _FriendDebtSummary toSummary({List<String> counterSplitIds = const []}) {
     return _FriendDebtSummary(
       memberId: memberId,
       name: name,
@@ -843,6 +933,7 @@ class _FriendDebtAccumulator {
       userId: userId,
       bills: List<FriendBillItem>.unmodifiable(_bills),
       totalAmount: _totalAmount,
+      counterSplitIds: counterSplitIds,
     );
   }
 }

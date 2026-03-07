@@ -14,6 +14,7 @@ class QrPaymentData {
   final double amount;
   final String? payeeName;
   final String? settlementId;
+  final String? settlementToken;
 
   QrPaymentData({
     required this.type,
@@ -22,6 +23,7 @@ class QrPaymentData {
     required this.amount,
     this.payeeName,
     this.settlementId,
+    this.settlementToken,
   });
 
   factory QrPaymentData.fromJson(Map<String, dynamic> json) {
@@ -32,6 +34,7 @@ class QrPaymentData {
       amount: (json['amount'] as num?)?.toDouble() ?? 0,
       payeeName: json['payee_name'] as String?,
       settlementId: json['settlement_id'] as String?,
+      settlementToken: json['settlement_token'] as String?,
     );
   }
 }
@@ -78,15 +81,20 @@ class PaymentService {
     required String tripId,
     required double amount,
     required List<String> expenseSplitIds,
+    List<String> counterExpenseSplitIds = const [],
   }) async {
+    final body = <String, dynamic>{
+      'payee_member_id': payeeMemberId,
+      'trip_id': tripId,
+      'amount': amount,
+      'expense_split_ids': expenseSplitIds,
+    };
+    if (counterExpenseSplitIds.isNotEmpty) {
+      body['counter_expense_split_ids'] = counterExpenseSplitIds;
+    }
     final response = await _client.post(
       '/payment/generate-qr',
-      body: {
-        'payee_member_id': payeeMemberId,
-        'trip_id': tripId,
-        'amount': amount,
-        'expense_split_ids': expenseSplitIds,
-      },
+      body: body,
     );
 
     if (!response.isSuccess || response.data == null) {
@@ -155,7 +163,9 @@ class PaymentService {
     required String settlementId,
     required double amount,
     required String receiverId,
-    required String transactionRef,
+    String? transactionRef,
+    String? rawPayload,
+    String? settlementToken,
   }) async {
     final response = await _client.post(
       '/payment/verify-slip',
@@ -163,7 +173,12 @@ class PaymentService {
         'settlement_id': settlementId,
         'amount': amount,
         'receiver_id': receiverId,
-        'transaction_ref': transactionRef,
+        if (transactionRef != null && transactionRef.isNotEmpty)
+          'transaction_ref': transactionRef,
+        if (rawPayload != null && rawPayload.isNotEmpty)
+          'raw_payload': rawPayload,
+        if (settlementToken != null && settlementToken.isNotEmpty)
+          'settlement_token': settlementToken,
       },
     );
 

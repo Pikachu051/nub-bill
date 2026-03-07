@@ -3,6 +3,11 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <!-- Required for all HTTP networking -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Required to save images on Android < 10 (API 29) -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
+    <!-- Required for push notifications on Android 13+ (API 33+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:label="nubbill"
         android:name="${applicationName}"
@@ -42,6 +47,10 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+        <!-- FCM default notification channel for Android 8.0+ -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="nub_bill_notifications" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

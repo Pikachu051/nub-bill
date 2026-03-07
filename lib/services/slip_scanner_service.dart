@@ -21,6 +21,14 @@ class SlipScannerService {
         if (parsed != null) {
           return parsed;
         }
+
+        // Keep raw payload as fallback so backend can parse/verify as source-of-truth.
+        return SlipQrData(
+          amount: null,
+          receiverId: null,
+          transactionRef: null,
+          rawPayload: raw.trim(),
+        );
       }
 
       return null;

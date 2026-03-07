@@ -15,7 +15,7 @@ import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/widgets/half_width_tab_indicator.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
 
-const _walletLoadTimeout = Duration(seconds: 5);
+const _walletLoadTimeout = Duration(seconds: 12);
 
 final tripBalancesWithTimeoutProvider = FutureProvider.autoDispose
     .family<List<BalanceEntry>, String>((ref, tripId) async {
@@ -42,6 +42,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
 
   late TabController _tabController;
   StreamSubscription? _expenseSubscription;
+  Timer? _walletRetryTimer;
 
   // Local state for bill list
   List<Expense> _expenses = [];
@@ -130,9 +131,21 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
 
   @override
   void dispose() {
+    _walletRetryTimer?.cancel();
     _expenseSubscription?.cancel();
     _tabController.dispose();
     super.dispose();
+  }
+
+  /// Schedules a single automatic wallet reload 3 seconds after a failure.
+  /// Prevents hammering the server while still recovering from cold-start timeouts.
+  void _scheduleWalletAutoRetry() {
+    _walletRetryTimer?.cancel();
+    _walletRetryTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
+      ref.invalidate(tripBalancesProvider(widget.groupId));
+      ref.invalidate(tripBalancesWithTimeoutProvider(widget.groupId));
+    });
   }
 
   @override
@@ -142,6 +155,16 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       tripBalancesWithTimeoutProvider(widget.groupId),
     );
     final debtsAsync = ref.watch(tripDebtsProvider(widget.groupId));
+
+    // Auto-retry once when the wallet balances fail (e.g. Vercel cold-start timeout)
+    ref.listen<AsyncValue<List<BalanceEntry>>>(
+      tripBalancesWithTimeoutProvider(widget.groupId),
+      (prev, next) {
+        if (next.hasError && !(prev?.hasError ?? false)) {
+          _scheduleWalletAutoRetry();
+        }
+      },
+    );
 
     return tripDetailAsync.when(
       loading: () =>
@@ -1044,6 +1067,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
           if (result == true) {
             _reloadExpenses();
             ref.invalidate(tripDebtsProvider(widget.groupId));
+            ref.invalidate(tripExpensesProvider(widget.groupId));
           }
         },
         child: Padding(
@@ -1342,10 +1366,12 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
-        onTap: () {
+        onTap: () async {
           if (iOwe) {
+            if (!mounted) return;
+
             // Navigate to payment
-            context.push(
+            final result = await context.push<bool?>(
               '/payment',
               extra: {
                 'amount': debt.amount,
@@ -1354,8 +1380,16 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                 'payeeName': debt.toName,
                 'payeeAvatarUrl': debt.toAvatarUrl,
                 'promptpayId': null,
+                'expenseSplitIds': debt.expenseSplitIds,
+                'counterExpenseSplitIds': debt.counterExpenseSplitIds,
               },
             );
+
+            if (result == true && mounted) {
+              ref.invalidate(tripDebtsProvider(widget.groupId));
+              ref.invalidate(tripExpensesProvider(widget.groupId));
+              ref.invalidate(tripBalancesProvider(widget.groupId));
+            }
           }
         },
         child: Padding(

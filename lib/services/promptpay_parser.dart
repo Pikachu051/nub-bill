@@ -19,14 +19,21 @@ class PromptPayParser {
       return null;
     }
 
-    if (!_isValidCrc(payload)) {
-      return null;
+    // Standard PromptPay payment QR has a CRC-16 tag (6304).
+    // KBank VerSlip receipt QR uses a bank-specific checksum (Tag 91) instead —
+    // it's a database-index pointer, not a payment QR.
+    if (_isValidCrc(payload)) {
+      return _parsePaymentQr(payload);
     }
 
+    // Try to parse as a VerSlip receipt QR (Tag 91 checksum, nested TLV in Tag 00).
+    return _parseVerSlipQr(payload);
+  }
+
+  /// Parse a standard PromptPay payment QR (has CRC-16 Tag 63).
+  static SlipQrData? _parsePaymentQr(String payload) {
     final rootTags = _parseTlv(payload);
-    if (rootTags.isEmpty) {
-      return null;
-    }
+    if (rootTags.isEmpty) return null;
 
     final amount = _parseAmount(rootTags['54']);
     final receiverId = _extractReceiverId(rootTags);
@@ -41,6 +48,30 @@ class PromptPayParser {
     return SlipQrData(
       amount: amount,
       receiverId: receiverId,
+      transactionRef: transactionRef,
+      rawPayload: payload,
+    );
+  }
+
+  /// Parse a KBank VerSlip receipt QR.
+  /// Structure: Tag 00 (vendor blob with nested TLV) + Tag 51 (country) + Tag 91 (bank checksum).
+  /// The nested blob contains: sub-tag 00 (format), sub-tag 01 (bank code), sub-tag 02 (transaction ref).
+  static SlipQrData? _parseVerSlipQr(String payload) {
+    final rootTags = _parseTlv(payload);
+    // Must have Tag 91 (bank checksum) to be considered a VerSlip.
+    if (!rootTags.containsKey('91')) return null;
+
+    final vendorBlob = rootTags['00'] ?? '';
+    if (vendorBlob.isEmpty) return null;
+
+    final innerTags = _parseTlv(vendorBlob);
+    final transactionRef = innerTags['02']?.trim();
+
+    if (transactionRef == null || transactionRef.isEmpty) return null;
+
+    return SlipQrData(
+      amount: null,      // VerSlip QR never contains amount
+      receiverId: null,  // VerSlip QR never contains receiver ID
       transactionRef: transactionRef,
       rawPayload: payload,
     );

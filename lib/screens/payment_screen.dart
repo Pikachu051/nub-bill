@@ -1,10 +1,16 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gal/gal.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:nubbill/services/payment_service.dart';
 import 'package:nubbill/services/slip_scanner_service.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:nubbill/widgets/slip_verification_modal.dart';
 
@@ -16,6 +22,7 @@ class PaymentScreen extends ConsumerStatefulWidget {
   final String? payeeAvatarUrl;
   final String? promptpayId;
   final List<String>? expenseSplitIds;
+  final List<String>? counterExpenseSplitIds;
 
   const PaymentScreen({
     super.key,
@@ -26,6 +33,7 @@ class PaymentScreen extends ConsumerStatefulWidget {
     this.payeeAvatarUrl,
     this.promptpayId,
     this.expenseSplitIds,
+    this.counterExpenseSplitIds,
   });
 
   @override
@@ -35,16 +43,24 @@ class PaymentScreen extends ConsumerStatefulWidget {
 class _PaymentScreenState extends ConsumerState<PaymentScreen> {
   final _imagePicker = ImagePicker();
   final _slipScannerService = SlipScannerService();
+  final _qrKey = GlobalKey();
 
   QrPaymentData? _qrData;
   bool _isLoading = true;
   bool _isPickingSlip = false;
   String? _error;
+  SlipVerificationController? _verificationController;
 
   @override
   void initState() {
     super.initState();
     _generateQr();
+  }
+
+  @override
+  void dispose() {
+    _verificationController?.dispose();
+    super.dispose();
   }
 
   Future<void> _generateQr() async {
@@ -64,6 +80,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         tripId: widget.tripId!,
         amount: widget.amount,
         expenseSplitIds: widget.expenseSplitIds ?? [],
+        counterExpenseSplitIds: widget.counterExpenseSplitIds ?? [],
       );
       setState(() {
         _qrData = qrData;
@@ -106,7 +123,7 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         child: SizedBox(
           height: 52,
           child: FilledButton.icon(
-            onPressed: _isPickingSlip ? null : _onAttachSlipPressed,
+          onPressed: _isPickingSlip ? null : _onAttachSlipPressed,
             icon: _isPickingSlip
                 ? const SizedBox(
                     width: 18,
@@ -214,21 +231,24 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: const Color(0xFFEDEDED)),
             ),
-            child: _error != null
-                ? Center(
-                    child: Text(
-                      _error!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Color(0xFFE86868)),
-                    ),
-                  )
-                : (_qrData != null && _qrData!.payload.isNotEmpty)
-                ? QrImageView(
-                    data: _qrData!.payload,
-                    version: QrVersions.auto,
-                    backgroundColor: Colors.white,
-                  )
-                : const Icon(AppIcons.qrCode, size: 120, color: Color(0xFFA8A8A8)),
+            child: RepaintBoundary(
+              key: _qrKey,
+              child: _error != null
+                  ? Center(
+                      child: Text(
+                        _error!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: Color(0xFFE86868)),
+                      ),
+                    )
+                  : (_qrData != null && _qrData!.payload.isNotEmpty)
+                  ? QrImageView(
+                      data: _qrData!.payload,
+                      version: QrVersions.auto,
+                      backgroundColor: Colors.white,
+                    )
+                  : const Icon(AppIcons.qrCode, size: 120, color: Color(0xFFA8A8A8)),
+            ),
           ),
           const SizedBox(height: 18),
           const Text(
@@ -271,32 +291,45 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     if (_isPickingSlip) return;
 
     setState(() => _isPickingSlip = true);
-    var verifyingModalVisible = false;
+
+    // Create controller starting at verifying state.
+    _verificationController?.dispose();
+    _verificationController = SlipVerificationController(
+      const SlipVerificationDisplayState(
+        modalState: SlipVerificationModalState.verifying,
+      ),
+    );
+
+    // Open a single persistent dialog driven by the controller.
+    // The dialog stays open through local scan AND backend verification,
+    // then animates to the result state in-place.
+    unawaited(showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withValues(alpha: 0.42),
+      builder: (ctx) =>
+          SlipVerificationModal(controller: _verificationController!),
+    ));
+
     try {
-      final pickedFile = await _imagePicker.pickImage(source: ImageSource.gallery);
+      final pickedFile =
+          await _imagePicker.pickImage(source: ImageSource.gallery);
       if (!mounted || pickedFile == null) {
+        if (mounted) Navigator.of(context, rootNavigator: true).pop();
         return;
       }
 
-      _showModal(SlipVerificationModalState.verifying, dismissible: false);
-      verifyingModalVisible = true;
-
-      final parsedData = await _slipScannerService.scanSlipImage(pickedFile.path);
-
-      if (mounted && verifyingModalVisible) {
-        Navigator.of(context, rootNavigator: true).pop();
-        verifyingModalVisible = false;
-      }
+      // Both scan and backend call happen while modal shows verifying state.
+      final parsedData =
+          await _slipScannerService.scanSlipImage(pickedFile.path);
 
       if (!mounted) return;
 
-      if (parsedData == null ||
-          (parsedData.transactionRef == null || parsedData.transactionRef!.isEmpty) ||
-          _qrData?.settlementId == null) {
-        await _showModal(
-          SlipVerificationModalState.unreadable,
+      if (parsedData == null || _qrData?.settlementId == null) {
+        _verificationController?.update(SlipVerificationDisplayState(
+          modalState: SlipVerificationModalState.unreadable,
           onAttachSlip: _retryAttachSlip,
-        );
+        ));
         return;
       }
 
@@ -305,13 +338,17 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         settlementId: _qrData!.settlementId!,
         amount: parsedData.amount ?? 0,
         receiverId: parsedData.receiverId ?? '',
-        transactionRef: parsedData.transactionRef!,
+        transactionRef: parsedData.transactionRef,
+        rawPayload: parsedData.rawPayload,
+        settlementToken: _qrData?.settlementToken,
       );
 
       if (!mounted) return;
 
       if (result.success && result.status == 'success') {
-        _showModal(SlipVerificationModalState.success, dismissible: false);
+        _verificationController?.update(const SlipVerificationDisplayState(
+          modalState: SlipVerificationModalState.success,
+        ));
         await Future.delayed(const Duration(seconds: 3));
         if (mounted) {
           Navigator.of(context, rootNavigator: true).pop();
@@ -320,38 +357,60 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
         return;
       }
 
-      if (result.status == 'partial_payment' || result.status == 'amount_mismatch') {
-        await _showModal(
-          SlipVerificationModalState.amountMismatch,
+      if (result.status == 'partial_payment' ||
+          result.status == 'amount_mismatch') {
+        _verificationController?.update(SlipVerificationDisplayState(
+          modalState: SlipVerificationModalState.amountMismatch,
           onAttachSlip: _retryAttachSlip,
           paidAmount: result.paidAmount,
           deductedAmount: result.paidAmount,
           remainingAmount: result.remainingAmount,
-        );
+        ));
         return;
       }
 
       if (result.status == 'duplicate' || result.isDuplicate) {
-        await _showModal(
-          SlipVerificationModalState.duplicate,
+        _verificationController?.update(SlipVerificationDisplayState(
+          modalState: SlipVerificationModalState.duplicate,
           onAttachSlip: _retryAttachSlip,
-        );
+        ));
         return;
       }
 
-      await _showModal(
-        SlipVerificationModalState.unreadable,
-        onAttachSlip: _retryAttachSlip,
-      );
-    } catch (_) {
-      if (mounted && verifyingModalVisible) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-      if (mounted) {
-        await _showModal(
-          SlipVerificationModalState.unreadable,
+      if (result.status == 'receiver_mismatch') {
+        if (mounted && result.message != null && result.message!.isNotEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(result.message!),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        _verificationController?.update(SlipVerificationDisplayState(
+          modalState: SlipVerificationModalState.unreadable,
           onAttachSlip: _retryAttachSlip,
-        );
+        ));
+        return;
+      }
+
+      if (result.status == 'needs_review') {
+        _verificationController?.update(SlipVerificationDisplayState(
+          modalState: SlipVerificationModalState.needsReview,
+          onClose: _closeVerificationDialog,
+        ));
+        return;
+      }
+
+      _verificationController?.update(SlipVerificationDisplayState(
+        modalState: SlipVerificationModalState.unreadable,
+        onAttachSlip: _retryAttachSlip,
+      ));
+    } catch (_) {
+      if (mounted) {
+        _verificationController?.update(SlipVerificationDisplayState(
+          modalState: SlipVerificationModalState.unreadable,
+          onAttachSlip: _retryAttachSlip,
+        ));
       }
     } finally {
       if (mounted) {
@@ -360,31 +419,15 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     }
   }
 
-  Future<void> _showModal(
-    SlipVerificationModalState state, {
-    bool dismissible = true,
-    VoidCallback? onAttachSlip,
-    double? paidAmount,
-    double? deductedAmount,
-    double? remainingAmount,
-  }) {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: dismissible,
-      barrierColor: Colors.black.withValues(alpha: 0.42),
-      builder: (context) => SlipVerificationModal(
-        state: state,
-        onAttachSlip: onAttachSlip,
-        paidAmount: paidAmount,
-        deductedAmount: deductedAmount,
-        remainingAmount: remainingAmount,
-      ),
-    );
-  }
-
   void _retryAttachSlip() {
     Navigator.of(context, rootNavigator: true).pop();
+    // _onAttachSlipPressed has already completed (finally ran, _isPickingSlip=false)
+    // so re-entry guard is clear and we can call directly.
     _onAttachSlipPressed();
+  }
+
+  void _closeVerificationDialog() {
+    Navigator.of(context, rootNavigator: true).pop();
   }
 
   void _copyPromptpay(String id) {
@@ -394,10 +437,36 @@ class _PaymentScreenState extends ConsumerState<PaymentScreen> {
     );
   }
 
-  void _saveQrCode() {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('บันทึกรูป QR Code แล้ว')));
+  Future<void> _saveQrCode() async {
+    try {
+      final boundary =
+          _qrKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return;
+
+      final image = await boundary.toImage(pixelRatio: 3.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return;
+
+      final pngBytes = byteData.buffer.asUint8List();
+
+      final directory = await getTemporaryDirectory();
+      final file = File('${directory.path}/nubbill_promptpay_qr.png');
+      await file.writeAsBytes(pngBytes);
+
+      await Gal.putImage(file.path, album: 'NubBill');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('บันทึก QR Code ลงในคลังภาพแล้ว')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('ไม่สามารถบันทึก QR Code: $e')),
+        );
+      }
+    }
   }
 
   String _maskPromptpayId(String value) {

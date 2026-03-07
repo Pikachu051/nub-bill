@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:nubbill/providers/notification_provider.dart';
 import 'package:nubbill/shared/app_icons.dart';
 
 /// Custom Navigation Bar matching the design prototype exactly
@@ -7,15 +9,16 @@ import 'package:nubbill/shared/app_icons.dart';
 /// - Icon on top, text below (vertical layout)
 /// - Selected: blue icon + horizontal bar on top
 /// - Animated transitions when switching tabs
-class ScaffoldWithNavBar extends StatelessWidget {
+class ScaffoldWithNavBar extends ConsumerWidget {
   final Widget navigationShell;
 
   const ScaffoldWithNavBar({required this.navigationShell, super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final shell = navigationShell as StatefulNavigationShell;
     final currentIndex = shell.currentIndex;
+    final unreadCount = ref.watch(unreadNotificationCountProvider);
 
     return Scaffold(
       body: navigationShell,
@@ -50,12 +53,19 @@ class ScaffoldWithNavBar extends StatelessWidget {
                   isActive: currentIndex == 1,
                   onTap: () => _onTap(shell, 1),
                 ),
-                _NavItem(
-                  icon: AppIcons.notifications,
-                  activeIcon: AppIcons.notifications,
-                  label: 'แจ้งเตือน',
-                  isActive: currentIndex == 2,
-                  onTap: () => _onTap(shell, 2),
+                Badge(
+                  isLabelVisible: unreadCount > 0,
+                  label: Text(
+                    unreadCount > 99 ? '99+' : '$unreadCount',
+                    style: const TextStyle(fontSize: 10),
+                  ),
+                  child: _NavItem(
+                    icon: AppIcons.notifications,
+                    activeIcon: AppIcons.notifications,
+                    label: 'แจ้งเตือน',
+                    isActive: currentIndex == 2,
+                    onTap: () => _onTap(shell, 2),
+                  ),
                 ),
                 _NavItem(
                   icon: AppIcons.profile,

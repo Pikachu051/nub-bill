@@ -177,6 +177,14 @@ final routerProvider = Provider<GoRouter>((ref) {
               splitIds = splitIdsRaw.map((item) => item.toString()).toList();
             }
 
+            final counterSplitIdsRaw = extra['counterExpenseSplitIds'];
+            List<String>? counterSplitIds;
+            if (counterSplitIdsRaw is List<String>) {
+              counterSplitIds = counterSplitIdsRaw;
+            } else if (counterSplitIdsRaw is List) {
+              counterSplitIds = counterSplitIdsRaw.map((item) => item.toString()).toList();
+            }
+
             return PaymentScreen(
               amount: (extra['amount'] as num?)?.toDouble() ?? 0,
               memberId: extra['memberId'] as String?,
@@ -185,6 +193,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               payeeAvatarUrl: extra['payeeAvatarUrl'] as String?,
               promptpayId: extra['promptpayId'] as String?,
               expenseSplitIds: splitIds,
+              counterExpenseSplitIds: counterSplitIds,
             );
           }
           return const PaymentScreen();
@@ -291,6 +300,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
       GoRoute(
         path: '/groups/:id',
+        builder: (context, state) {
+          final groupId = state.pathParameters['id'] ?? '';
+          return GroupDetailPage(groupId: groupId);
+        },
+      ),
+      // Alias used by notification deep links
+      GoRoute(
+        path: '/trips/:id',
         builder: (context, state) {
           final groupId = state.pathParameters['id'] ?? '';
           return GroupDetailPage(groupId: groupId);

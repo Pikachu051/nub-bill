@@ -31,8 +31,17 @@ class TripMember {
   bool get isGhost => userId == null;
 
   factory TripMember.fromJson(Map<String, dynamic> json) {
-    // Handle nested profile data
-    final profiles = json['profiles'] as Map<String, dynamic>?;
+    final rawProfiles = json['profiles'];
+    Map<String, dynamic>? profiles;
+
+    if (rawProfiles is Map<String, dynamic>) {
+      profiles = rawProfiles;
+    } else if (rawProfiles is List && rawProfiles.isNotEmpty) {
+      final first = rawProfiles.first;
+      if (first is Map<String, dynamic>) {
+        profiles = first;
+      }
+    }
 
     return TripMember(
       id: json['id'] as String,

@@ -200,13 +200,20 @@ class ApiResponse {
     try {
       if (response.body.isNotEmpty) {
         data = jsonDecode(response.body);
-        // Check if response contains an error field
-        if (data is Map && data.containsKey('error')) {
-          error = data['error']?.toString();
+        if (data is Map) {
+          if (data.containsKey('error') && data['error'] != null) {
+            error = data['error'].toString();
+          } else if (data.containsKey('message') && data['message'] != null) {
+            error = data['message'].toString();
+          }
         }
       }
     } catch (e) {
       data = response.body;
+      final isSuccess = response.statusCode >= 200 && response.statusCode < 300;
+      if (!isSuccess && response.body.isNotEmpty) {
+        error = response.body;
+      }
     }
 
     return ApiResponse(
