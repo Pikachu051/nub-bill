@@ -6,6 +6,8 @@ import 'package:nubbill/services/friend_service.dart';
 import 'package:nubbill/widgets/add_friend_modal.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
 
+const String _kFont = 'LINESeedSansTH';
+
 class FriendsScreen extends ConsumerStatefulWidget {
   const FriendsScreen({super.key});
 
@@ -47,11 +49,16 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     final requestsAsync = ref.watch(pendingRequestsProvider);
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text(
           'รายชื่อเพื่อน',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: Color(0xB2141416),
+            fontSize: 20,
+            fontFamily: _kFont,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         centerTitle: true,
         backgroundColor: Colors.white,
@@ -65,30 +72,16 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 80),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 16),
-
-              // Search bar + Add friend button row
               _buildSearchRow(context),
-
-              const SizedBox(height: 20),
-
-              // Friend requests section (collapsible)
+              const SizedBox(height: 24),
               _buildFriendRequestsSection(requestsAsync),
-
-              // Friends list header
               _buildFriendsHeader(friendsAsync),
-
               const SizedBox(height: 12),
-
-              // Friends list
               _buildFriendsList(friendsAsync),
-
-              // Bottom padding for FAB
-              const SizedBox(height: 80),
             ],
           ),
         ),
@@ -97,10 +90,29 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
         heroTag: 'friendsCreateGroupFab',
         onPressed: () => context.push('/groups/create'),
         backgroundColor: const Color(0xFF81CEF2),
-        icon: const Icon(AppIcons.add, color: Colors.white),
-        label: const Text(
-          'สร้างกลุ่มใหม่',
-          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+        icon: const Icon(AppIcons.people, color: Colors.white),
+        label: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'สร้างกลุ่มใหม่',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(width: 8),
+            Text(
+              '|',
+              style: TextStyle(
+                color: Colors.white70,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            SizedBox(width: 8),
+            Icon(AppIcons.chevronUp, color: Colors.white, size: 24),
+          ],
         ),
       ),
     );
@@ -109,46 +121,69 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   Widget _buildSearchRow(BuildContext context) {
     return Row(
       children: [
-        // Search bar
         Expanded(
           child: Container(
-            height: 44,
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.grey[100],
-              borderRadius: BorderRadius.circular(22),
+              color: const Color(0x19141416),
+              borderRadius: BorderRadius.circular(30),
             ),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'ค้นหาเพื่อน...',
-                hintStyle: TextStyle(color: Colors.grey[400], fontSize: 14),
-                prefixIcon: Icon(
-                  AppIcons.search,
-                  color: Colors.grey[400],
-                  size: 20,
+            child: Row(
+              children: [
+                const Icon(AppIcons.search, color: Color(0x66141416), size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    textAlignVertical: TextAlignVertical.center,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      hintText: 'ค้นหาเพื่อน. . .',
+                      hintStyle: TextStyle(
+                        color: Color(0x66141416),
+                        fontSize: 16,
+                        fontFamily: _kFont,
+                        fontWeight: FontWeight.w400,
+                      ),
+                      filled: false,
+                      fillColor: Colors.transparent,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      disabledBorder: InputBorder.none,
+                      errorBorder: InputBorder.none,
+                      focusedErrorBorder: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                    style: const TextStyle(
+                      color: Color(0xB2141416),
+                      fontSize: 16,
+                      fontFamily: _kFont,
+                    ),
+                  ),
                 ),
-                border: InputBorder.none,
-                contentPadding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              style: const TextStyle(fontSize: 14),
+              ],
             ),
           ),
         ),
         const SizedBox(width: 12),
-        // Add friend button
-        GestureDetector(
+        InkWell(
           onTap: () => _showAddFriendModal(context),
+          borderRadius: BorderRadius.circular(15),
           child: Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
+            width: 48,
+            height: 48,
+            decoration: ShapeDecoration(
               color: const Color(0xFF81CEF2),
-              borderRadius: BorderRadius.circular(22),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
             ),
             child: const Icon(
               AppIcons.personAdd,
               color: Colors.white,
-              size: 22,
+              size: 24,
             ),
           ),
         ),
@@ -166,9 +201,9 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
         if (requests.incoming.isEmpty) return const SizedBox.shrink();
 
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header with expand/collapse
-            GestureDetector(
+            InkWell(
               onTap: () =>
                   setState(() => _requestsExpanded = !_requestsExpanded),
               child: Row(
@@ -177,26 +212,28 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                   Text(
                     'คำขอเป็นเพื่อน (${requests.incoming.length})',
                     style: const TextStyle(
+                      color: Color(0xB2141416),
                       fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                      fontFamily: _kFont,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                   Icon(
                     _requestsExpanded
                         ? AppIcons.chevronUp
                         : AppIcons.chevronDown,
-                    color: Colors.grey[600],
+                    color: const Color(0x7F141416),
+                    size: 20,
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 8),
-            // Request cards
+            const SizedBox(height: 12),
             if (_requestsExpanded)
               ...requests.incoming.map(
                 (req) => _IncomingRequestCard(request: req),
               ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
           ],
         );
       },
@@ -211,13 +248,22 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
       children: [
         Text(
           'เพื่อนของคุณ ($count คน)',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Color(0xB2141416),
+            fontSize: 16,
+            fontFamily: _kFont,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-        IconButton(
-          onPressed: () {
+        InkWell(
+          onTap: () {
             // TODO: Show filter options
           },
-          icon: Icon(AppIcons.tune, color: Colors.grey[600]),
+          borderRadius: BorderRadius.circular(12),
+          child: const Padding(
+            padding: EdgeInsets.all(2),
+            child: Icon(AppIcons.tune, color: Color(0x7F141416), size: 20),
+          ),
         ),
       ],
     );
@@ -258,12 +304,19 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                   const SizedBox(height: 16),
                   const Text(
                     'ยังไม่มีเพื่อน',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(
+                      color: Color(0x7F141416),
+                      fontFamily: _kFont,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   const Text(
                     'กดปุ่มเพิ่มเพื่อนเพื่อเริ่มต้น',
-                    style: TextStyle(color: Colors.grey, fontSize: 12),
+                    style: TextStyle(
+                      color: Color(0x7F141416),
+                      fontSize: 12,
+                      fontFamily: _kFont,
+                    ),
                   ),
                 ],
               ),
@@ -281,7 +334,10 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                   const SizedBox(height: 12),
                   const Text(
                     'ไม่พบเพื่อนที่ค้นหา',
-                    style: TextStyle(color: Colors.grey),
+                    style: TextStyle(
+                      color: Color(0x7F141416),
+                      fontFamily: _kFont,
+                    ),
                   ),
                 ],
               ),
@@ -289,10 +345,14 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
           );
         }
 
-        return Column(
-          children: filtered
-              .map((friend) => _FriendCard(friend: friend))
-              .toList(),
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: filtered.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 8),
+          itemBuilder: (context, index) {
+            return _FriendCard(friend: filtered[index]);
+          },
         );
       },
     );
@@ -391,90 +451,137 @@ class _FriendCardState extends ConsumerState<_FriendCard> {
     if (friend.balance == 0) {
       balanceLabel = 'ไม่มียอดค้างต่อกัน';
       balanceAmount = '';
-      balanceColor = Colors.grey;
+      balanceColor = const Color(0x7F141416);
     } else if (isOwed) {
       balanceLabel = 'คุณรอรับเงิน';
       balanceAmount = '+${friend.balance.abs().toStringAsFixed(2)}฿';
-      balanceColor = const Color(0xFF81CEF2);
+      balanceColor = const Color(0xFF3DCB57);
     } else {
       balanceLabel = 'คุณค้างจ่าย';
       balanceAmount = '-${friend.balance.abs().toStringAsFixed(2)}฿';
-      balanceColor = Colors.red;
+      balanceColor = const Color(0xFFFC5154);
     }
 
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        leading: CircleAvatar(
-          radius: 24,
-          backgroundColor: const Color(0xFF81CEF2).withValues(alpha: 0.2),
-          backgroundImage: friend.avatarUrl != null
-              ? NetworkImage(friend.avatarUrl!)
-              : null,
-          child: friend.avatarUrl == null
-              ? Text(
-                  friend.nickname.isNotEmpty
-                      ? friend.nickname[0].toUpperCase()
-                      : '?',
-                  style: const TextStyle(
-                    color: Color(0xFF81CEF2),
-                    fontWeight: FontWeight.bold,
-                    fontSize: 18,
-                  ),
-                )
-              : null,
-        ),
-        title: Text(friend.nickname, style: const TextStyle(fontSize: 16)),
-        trailing: Row(
-          mainAxisSize: MainAxisSize.min,
+    return InkWell(
+      onTap: () {
+        // TODO: Navigate to friend detail
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 2),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
+            Expanded(
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: const Color(0x1981CEF2),
+                    backgroundImage: friend.avatarUrl != null
+                        ? NetworkImage(friend.avatarUrl!)
+                        : null,
+                    child: friend.avatarUrl == null
+                        ? Text(
+                            friend.nickname.isNotEmpty
+                                ? friend.nickname[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              color: Color(0xFF81CEF2),
+                              fontSize: 18,
+                              fontFamily: _kFont,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      friend.nickname,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xB2141416),
+                        fontSize: 16,
+                        fontFamily: _kFont,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  balanceLabel,
-                  style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      balanceLabel,
+                      style: TextStyle(
+                        color: balanceColor,
+                        fontSize: 12,
+                        fontFamily: _kFont,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    if (balanceAmount.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        balanceAmount,
+                        style: TextStyle(
+                          color: balanceColor,
+                          fontSize: 14,
+                          fontFamily: _kFont,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-                if (balanceAmount.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    balanceAmount,
-                    style: TextStyle(
-                      color: balanceColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+                if (isOwed) ...[
+                  const SizedBox(width: 12),
+                  InkWell(
+                    onTap: _isSendingReminder ? null : _onPressRemind,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: ShapeDecoration(
+                        shape: RoundedRectangleBorder(
+                          side: const BorderSide(
+                            width: 1,
+                            color: Color(0xFF81CEF2),
+                          ),
+                          borderRadius: BorderRadius.circular(30),
+                        ),
+                      ),
+                      child: Center(
+                        child: _isSendingReminder
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Color(0xFF81CEF2),
+                                ),
+                              )
+                            : const Icon(
+                                AppIcons.notifications,
+                                color: Color(0xFF81CEF2),
+                                size: 16,
+                              ),
+                      ),
                     ),
                   ),
                 ],
               ],
             ),
-            const SizedBox(width: 8),
-            IconButton(
-              onPressed: isOwed ? _onPressRemind : null,
-              icon: _isSendingReminder
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(
-                      AppIcons.notifications,
-                      color: isOwed
-                          ? const Color(0xFF81CEF2)
-                          : Colors.grey[350],
-                      size: 24,
-                    ),
-            ),
           ],
         ),
-        onTap: () {
-          // TODO: Navigate to friend detail
-        },
       ),
     );
   }
@@ -549,11 +656,11 @@ class _IncomingRequestCardState extends ConsumerState<_IncomingRequestCard> {
 
     return Card(
       elevation: 0,
-      color: Colors.white,
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      color: const Color(0xFFF8FBFD),
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(
           children: [
             CircleAvatar(
@@ -581,11 +688,19 @@ class _IncomingRequestCardState extends ConsumerState<_IncomingRequestCard> {
                 children: [
                   Text(
                     widget.request.requesterName,
-                    style: const TextStyle(fontWeight: FontWeight.bold),
+                    style: const TextStyle(
+                      color: Color(0xB2141416),
+                      fontFamily: _kFont,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   Text(
                     timeText,
-                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0x7F141416),
+                      fontFamily: _kFont,
+                    ),
                   ),
                 ],
               ),
@@ -599,8 +714,10 @@ class _IncomingRequestCardState extends ConsumerState<_IncomingRequestCard> {
             else ...[
               TextButton(
                 onPressed: _reject,
-                style: TextButton.styleFrom(foregroundColor: Colors.grey),
-                child: const Text('ลบ'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0x7F141416),
+                ),
+                child: const Text('ลบ', style: TextStyle(fontFamily: _kFont)),
               ),
               const SizedBox(width: 8),
               ElevatedButton(
@@ -613,7 +730,10 @@ class _IncomingRequestCardState extends ConsumerState<_IncomingRequestCard> {
                     borderRadius: BorderRadius.circular(20),
                   ),
                 ),
-                child: const Text('ยืนยัน'),
+                child: const Text(
+                  'ยืนยัน',
+                  style: TextStyle(fontFamily: _kFont),
+                ),
               ),
             ],
           ],

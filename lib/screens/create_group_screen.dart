@@ -782,8 +782,19 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                     final friend = filteredFriends[index];
                     final isSelected = _selectedMemberIds.contains(friend.id);
 
+                    void toggleSelection() {
+                      setState(() {
+                        if (isSelected) {
+                          _selectedMemberIds.remove(friend.id);
+                        } else {
+                          _selectedMemberIds.add(friend.id);
+                        }
+                      });
+                    }
+
                     return ListTile(
                       contentPadding: EdgeInsets.zero,
+                      onTap: toggleSelection,
                       leading: Container(
                         width: 48,
                         height: 48,
@@ -825,40 +836,29 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                           fontWeight: FontWeight.w400,
                         ),
                       ),
-                      trailing: GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            if (isSelected) {
-                              _selectedMemberIds.remove(friend.id);
-                            } else {
-                              _selectedMemberIds.add(friend.id);
-                            }
-                          });
-                        },
-                        child: AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          width: 28,
-                          height: 28,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
+                      trailing: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        width: 18,
+                        height: 18,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected
+                              ? const Color(0xFF81CEF2)
+                              : Colors.transparent,
+                          border: Border.all(
                             color: isSelected
                                 ? const Color(0xFF81CEF2)
-                                : Colors.transparent,
-                            border: Border.all(
-                              color: isSelected
-                                  ? const Color(0xFF81CEF2)
-                                  : Colors.grey.shade300,
-                              width: 2,
-                            ),
+                                : Colors.grey.shade300,
+                            width: 1.6,
                           ),
-                          child: isSelected
-                              ? const Icon(
-                                  AppIcons.check,
-                                  color: Colors.white,
-                                  size: 18,
-                                )
-                              : null,
                         ),
+                        child: isSelected
+                            ? const Icon(
+                                AppIcons.check,
+                                color: Colors.white,
+                                size: 10,
+                              )
+                            : null,
                       ),
                     );
                   },
