@@ -120,18 +120,14 @@ class NotificationNotifier extends StateNotifier<NotificationState> {
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'notifications',
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: _userId!,
-          ),
           callback: (payload) {
             final row = payload.newRecord;
-            final notification = AppNotification.fromJson(row);
-            state = state.copyWith(
-              notifications: [notification, ...state.notifications],
-              unreadCount: state.unreadCount + 1,
-            );
+            final targetUserId = row['user_id']?.toString();
+            if (targetUserId != _userId) return;
+
+            // Pull from API to guarantee the same shape as list endpoint
+            // (includes actor join fields) and avoid silent parse drift.
+            refresh();
           },
         )
         .subscribe();
