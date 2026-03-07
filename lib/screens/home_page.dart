@@ -584,7 +584,7 @@ class HomePage extends ConsumerWidget {
       ? const Color(0xFF4CAF50)
       : (isNegative ? const Color(0xFFFF5252) : Colors.grey[500]);
     final amountColor = isPositive
-      ? const Color(0xFF81CEF2)
+      ? const Color(0xFF3DCB57)
       : (isNegative ? const Color(0xFFFF5252) : Colors.grey[500]);
 
     return Card(
@@ -627,7 +627,7 @@ class HomePage extends ConsumerWidget {
               style: TextStyle(
                 color: amountColor,
                 fontWeight: FontWeight.normal,
-                fontSize: 14,
+                fontSize: 15,
               ),
             ),
           ],
