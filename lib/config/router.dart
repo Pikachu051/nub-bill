@@ -28,6 +28,7 @@ import 'package:nubbill/screens/add_expense_screen.dart';
 import 'package:nubbill/models/trip_member_model.dart';
 import 'package:nubbill/models/trip_model.dart';
 import 'package:nubbill/services/profile_service.dart';
+import 'package:nubbill/services/onboarding_state.dart';
 
 final rootNavigatorKey = GlobalKey<NavigatorState>();
 
@@ -65,7 +66,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     initialLocation: '/',
     debugLogDiagnostics: true,
     refreshListenable: GoRouterRefreshStream(authRepository.authStateChanges),
-    redirect: (context, state) {
+    redirect: (context, state) async {
       final session = authRepository.currentSession;
       final isLoggedIn = session != null;
       final isLoggingIn =
@@ -82,29 +83,15 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (isSplash) return null;
 
       final isOnboarding = state.uri.path == '/onboarding';
+      final hasLoggedInOnce = await OnboardingState.hasLoggedInOnce();
 
       if (!isLoggedIn) {
+        if (isOnboarding && hasLoggedInOnce) {
+          return '/welcome';
+        }
+
         if (isLoggingIn || isOnboarding) return null;
-        // Check local storage for onboarding seen (TODO: Implement actual check)
-        // For now, if going to /welcome (default for not logged in), maybe redirect to onboarding?
-        // Let's assume user always sees welcome or login. Onboarding is manual navigation or specific flow.
-        // User said: "Check authentication status... If not -> Go to Onboarding".
-        // Current logic: !isLoggedIn -> /welcome. I should change /welcome to be Onboarding if not seen?
-        // But I don't have persistence yet.
-        // I'll set default redirect to /onboarding for now instead of /welcome?
-        // Or create /welcome route to point to Onboarding?
 
-        // Let's make /welcome point to Onboarding for now as per instructions "Onboarding -> Login".
-        // Previously /welcome was AuthenticationPage.
-        // I will change route /welcome to OnboardingScreen?
-        // No, keep /welcome as Auth landing if intended.
-        // README says:
-        // 1. Splash
-        // 2. Check Auth
-        // 3. If logged in -> Home
-        // 4. If not -> Onboarding
-
-        // So I should redirect to /onboarding if not logged in.
         return '/welcome';
       }
 

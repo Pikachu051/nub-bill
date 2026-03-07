@@ -20,6 +20,7 @@ import 'package:nubbill/widgets/retry_error_state.dart';
 import 'package:nubbill/widgets/settlement_detail_modal.dart';
 
 const _walletLoadTimeout = Duration(seconds: 12);
+const String _kFont = 'LINESeedSansTH';
 
 final tripBalancesWithTimeoutProvider = FutureProvider.autoDispose
     .family<List<BalanceEntry>, String>((ref, tripId) async {
@@ -264,9 +265,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                     TabBar(
                       controller: _tabController,
                       labelColor: const Color(0xFF81CEF2),
-                      unselectedLabelColor: const Color(
-                        0xFF9E9E9E,
-                      ), // Light grey
+                      unselectedLabelColor: const Color(0xB2141416),
                       indicatorSize: TabBarIndicatorSize.tab,
                       indicator: const HalfWidthTabIndicator(
                         color: Color(0xFF81CEF2),
@@ -275,12 +274,14 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                         radius: 2,
                       ),
                       labelStyle: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        fontFamily: _kFont,
+                        fontWeight: FontWeight.w400,
                       ),
                       unselectedLabelStyle: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.normal,
+                        fontSize: 16,
+                        fontFamily: _kFont,
+                        fontWeight: FontWeight.w400,
                       ),
                       tabs: const [
                         Tab(text: 'รายการทั้งหมด'),
@@ -603,7 +604,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w600,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ],
@@ -637,7 +638,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 12,
-                                    fontWeight: FontWeight.w500,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ],
@@ -671,7 +672,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                                     style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 12,
-                                      fontWeight: FontWeight.w500,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
                                 ],
@@ -1222,10 +1223,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       margin: const EdgeInsets.only(bottom: 10),
       elevation: 0,
       color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFE8EDF3)),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () async {
@@ -1262,8 +1260,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                     Text(
                       expense.description,
                       style: const TextStyle(
-                        fontWeight: FontWeight.normal,
-                        fontSize: 14,
+                        color: Color(0xB2141416),
+                        fontSize: 16,
+                        fontFamily: _kFont,
+                        fontWeight: FontWeight.w400,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -1272,9 +1272,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                     Text(
                       payerLabel,
                       style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF7A8797),
-                        fontWeight: FontWeight.w500,
+                        color: Color(0x7F141416),
+                        fontSize: 11,
+                        fontFamily: _kFont,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ],
@@ -1314,10 +1315,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       margin: const EdgeInsets.only(bottom: 10),
       elevation: 0,
       color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: Color(0xFFE8EDF3)),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
@@ -1352,9 +1350,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                     const Text(
                       'เคลียร์บิล',
                       style: TextStyle(
-                        fontWeight: FontWeight.w700,
+                        color: Color(0xB2141416),
                         fontSize: 14,
-                        color: Color(0xFF141416),
+                        fontFamily: _kFont,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -1363,9 +1362,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 12,
-                        color: Color(0xFF7A8797),
-                        fontWeight: FontWeight.w500,
+                        color: Color(0x7F141416),
+                        fontSize: 11,
+                        fontFamily: _kFont,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ],
@@ -1378,7 +1378,8 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                     '${settlement.paidAmount.toStringAsFixed(2)}฿',
                     style: const TextStyle(
                       fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                      fontFamily: _kFont,
+                      fontWeight: FontWeight.w400,
                       color: Color(0xFF2E7D32),
                     ),
                   ),
@@ -1386,9 +1387,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                   const Text(
                     'เคลียร์แล้ว',
                     style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF7A8797),
-                      fontWeight: FontWeight.w500,
+                      color: Color(0x7F141416),
+                      fontSize: 10,
+                      fontFamily: _kFont,
+                      fontWeight: FontWeight.w400,
                     ),
                   ),
                 ],
@@ -1466,17 +1468,19 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
               'คุณค้างจ่าย',
               style: TextStyle(
                 fontSize: 12,
-                color: Color(0xFFFF5252),
-                fontWeight: FontWeight.normal,
+                color: Color(0xFFFC5154),
+                fontFamily: _kFont,
+                fontWeight: FontWeight.w400,
               ),
             ),
             if (userOweAmount != null)
               Text(
                 '${userOweAmount.toStringAsFixed(2)}฿',
                 style: const TextStyle(
-                  fontSize: 16,
-                  color: Color(0xFFFF5252),
-                  fontWeight: FontWeight.normal,
+                  fontSize: 14,
+                  color: Color(0xFFFC5154),
+                  fontFamily: _kFont,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
           ],
@@ -1489,16 +1493,18 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
               'คุณรอรับเงิน',
               style: TextStyle(
                 fontSize: 12,
-                color: Color(0xFF4CAF50),
-                fontWeight: FontWeight.normal,
+                color: Color(0xFF3DCB57),
+                fontFamily: _kFont,
+                fontWeight: FontWeight.w400,
               ),
             ),
             Text(
               '${displayAmount.toStringAsFixed(2)}฿',
               style: const TextStyle(
-                fontSize: 16,
-                color: Color(0xFF4CAF50),
-                fontWeight: FontWeight.normal,
+                fontSize: 14,
+                color: Color(0xFF3DCB57),
+                fontFamily: _kFont,
+                fontWeight: FontWeight.w400,
               ),
             ),
           ],
@@ -1511,13 +1517,19 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
               '${displayAmount.toStringAsFixed(2)}฿',
               style: const TextStyle(
                 fontSize: 14,
-                color: Color(0xFF4A4A4A),
-                fontWeight: FontWeight.normal,
+                color: Color(0x7F141416),
+                fontFamily: _kFont,
+                fontWeight: FontWeight.w400,
               ),
             ),
             Text(
               clearedMessage,
-              style: const TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
+              style: const TextStyle(
+                color: Color(0x7F141416),
+                fontSize: 12,
+                fontFamily: _kFont,
+                fontWeight: FontWeight.w400,
+              ),
             ),
           ],
         );
@@ -1527,12 +1539,22 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
           children: [
             const Text(
               'คุณไม่มีส่วนเกี่ยวข้อง',
-              style: TextStyle(fontSize: 12, color: Color(0xFF9E9E9E)),
+              style: TextStyle(
+                color: Color(0x7F141416),
+                fontSize: 12,
+                fontFamily: _kFont,
+                fontWeight: FontWeight.w400,
+              ),
             ),
             if (payerName != null && payerName != 'Unknown')
               Text(
                 'จ่ายโดย $payerName',
-                style: TextStyle(fontSize: 11, color: Colors.grey[400]),
+                style: const TextStyle(
+                  color: Color(0x7F141416),
+                  fontSize: 11,
+                  fontFamily: _kFont,
+                  fontWeight: FontWeight.w400,
+                ),
               ),
           ],
         );
@@ -1610,9 +1632,14 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       children: [
         Text(
           title,
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          style: const TextStyle(
+            color: Color(0xB2141416),
+            fontSize: 16,
+            fontFamily: _kFont,
+            fontWeight: FontWeight.w400,
+          ),
         ),
-        Icon(AppIcons.tune, size: 20, color: Colors.grey[400]),
+        const Icon(AppIcons.tune, size: 20, color: Color(0x7F141416)),
       ],
     );
   }
@@ -1631,27 +1658,24 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
       displayName = debt.toName;
       avatarUrl = debt.toAvatarUrl;
       statusText = 'คุณค้างจ่าย ${debt.amount.toStringAsFixed(2)}฿';
-      statusColor = Colors.red;
+      statusColor = const Color(0xFFFC5154);
     } else if (theyOweMe) {
       displayName = debt.fromName;
       avatarUrl = debt.fromAvatarUrl;
       statusText = 'คุณรอรับเงิน ${debt.amount.toStringAsFixed(2)}฿';
-      statusColor = Colors.green;
+      statusColor = const Color(0xFF3DCB57);
     } else {
       displayName = debt.fromName;
       avatarUrl = debt.fromAvatarUrl;
       statusText = 'ค้างจ่าย ${debt.toName} ${debt.amount.toStringAsFixed(2)}฿';
-      statusColor = Colors.grey;
+      statusColor = const Color(0x7F141416);
     }
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       elevation: 0,
       color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade200),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () async {
@@ -1707,17 +1731,20 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                     Text(
                       displayName,
                       style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
+                        color: Color(0xB2141416),
+                        fontSize: 16,
+                        fontFamily: _kFont,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       statusText,
                       style: TextStyle(
-                        fontSize: 13,
+                        fontSize: 12,
                         color: statusColor,
-                        fontWeight: FontWeight.w500,
+                        fontFamily: _kFont,
+                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ],
@@ -1768,7 +1795,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     try {
       await ref
           .read(friendServiceProvider)
-          .sendPaymentReminder(friendUserId: friendUserId, tripId: widget.groupId);
+          .sendPaymentReminder(
+            friendUserId: friendUserId,
+            tripId: widget.groupId,
+          );
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(

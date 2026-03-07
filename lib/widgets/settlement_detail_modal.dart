@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:nubbill/models/settlement_model.dart';
 import 'package:nubbill/shared/app_icons.dart';
 
+const String _kFont = 'LINESeedSansTH';
+
 Future<void> showSettlementHistorySheet(
   BuildContext context, {
   required List<SettlementRecord> settlements,
@@ -220,51 +222,118 @@ Future<void> showSettlementDetailModal(
                 'บันทึกการโอน',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w800,
-                  color: Color(0xFF141416),
+                  color: Color(0xB2141416),
+                  fontSize: 20,
+                  fontFamily: _kFont,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
               const SizedBox(height: 14),
               Container(
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF7FAFD),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: const Color(0xFFE5ECF4)),
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(color: const Color(0x19141416)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x1E333333),
+                      blurRadius: 12,
+                      offset: Offset(0, 4),
+                    ),
+                  ],
                 ),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Container(
-                      width: 58,
-                      height: 58,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F6EC),
-                        borderRadius: BorderRadius.circular(18),
-                      ),
-                      child: const Icon(
-                        AppIcons.checkCircle,
-                        color: Color(0xFF2E7D32),
-                        size: 28,
-                      ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3DCB57),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            AppIcons.check,
+                            size: 20,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'เคลียร์ยอดเรียบร้อย',
+                              style: TextStyle(
+                                color: Color(0xB2141416),
+                                fontSize: 16,
+                                fontFamily: _kFont,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              _formatDateTimeCompact(verifiedAt),
+                              style: const TextStyle(
+                                color: Color(0x4C141416),
+                                fontSize: 12,
+                                fontFamily: _kFont,
+                                fontWeight: FontWeight.w400,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      '${settlement.paidAmount.toStringAsFixed(2)} บาท',
-                      style: const TextStyle(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w900,
-                        color: Color(0xFF2E7D32),
-                      ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          '${settlement.paidAmount.toStringAsFixed(2)}฿',
+                          style: const TextStyle(
+                            color: Color(0xB2141416),
+                            fontSize: 24,
+                            fontFamily: _kFont,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF81CEF2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(
+                            AppIcons.receipt,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 8),
                     const Text(
                       'โอนสำเร็จแล้ว',
                       style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF5E6D7F),
+                        color: Color(0x7F141416),
+                        fontSize: 12,
+                        fontFamily: _kFont,
+                        fontWeight: FontWeight.w400,
                       ),
+                    ),
+                    const SizedBox(height: 16),
+                    _payerReceiverRow(
+                      payerName: payerName,
+                      payerAvatarUrl: settlement.payer?.avatarUrl,
+                      payeeName: payeeName,
+                      payeeAvatarUrl: settlement.payee?.avatarUrl,
                     ),
                   ],
                 ),
@@ -343,6 +412,62 @@ Future<void> showSettlementDetailModal(
   );
 }
 
+Widget _payerReceiverRow({
+  required String payerName,
+  required String? payerAvatarUrl,
+  required String payeeName,
+  required String? payeeAvatarUrl,
+}) {
+  return Row(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      _memberChip(name: payerName, avatarUrl: payerAvatarUrl),
+      const SizedBox(width: 8),
+      const Icon(AppIcons.chevronRight, size: 16, color: Color(0x7F141416)),
+      const SizedBox(width: 8),
+      _memberChip(name: payeeName, avatarUrl: payeeAvatarUrl),
+    ],
+  );
+}
+
+Widget _memberChip({required String name, required String? avatarUrl}) {
+  final displayName = name.trim().isEmpty ? 'สมาชิก' : name.trim();
+
+  return Row(
+    mainAxisSize: MainAxisSize.min,
+    children: [
+      CircleAvatar(
+        radius: 16,
+        backgroundColor: const Color(0x1981CEF2),
+        backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+            ? NetworkImage(avatarUrl)
+            : null,
+        child: avatarUrl == null || avatarUrl.isEmpty
+            ? Text(
+                displayName[0].toUpperCase(),
+                style: const TextStyle(
+                  color: Color(0xFF81CEF2),
+                  fontSize: 14,
+                  fontFamily: _kFont,
+                  fontWeight: FontWeight.w700,
+                ),
+              )
+            : null,
+      ),
+      const SizedBox(width: 8),
+      Text(
+        displayName,
+        style: const TextStyle(
+          color: Color(0xB2141416),
+          fontSize: 14,
+          fontFamily: _kFont,
+          fontWeight: FontWeight.w400,
+        ),
+      ),
+    ],
+  );
+}
+
 Widget _detailRow(String label, String value) {
   return Container(
     margin: const EdgeInsets.only(top: 8),
@@ -373,7 +498,7 @@ Widget _detailRow(String label, String value) {
             textAlign: TextAlign.right,
             style: const TextStyle(
               fontSize: 13,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w400,
               color: Color(0xFF141416),
             ),
           ),
@@ -406,4 +531,29 @@ String _formatDateTime(DateTime dateTime) {
   final hour = dateTime.hour.toString().padLeft(2, '0');
   final minute = dateTime.minute.toString().padLeft(2, '0');
   return '$day $month $year • $hour:$minute';
+}
+
+String _formatDateTimeCompact(DateTime dateTime) {
+  const thaiMonths = [
+    '',
+    'ม.ค.',
+    'ก.พ.',
+    'มี.ค.',
+    'เม.ย.',
+    'พ.ค.',
+    'มิ.ย.',
+    'ก.ค.',
+    'ส.ค.',
+    'ก.ย.',
+    'ต.ค.',
+    'พ.ย.',
+    'ธ.ค.',
+  ];
+
+  final day = dateTime.day.toString();
+  final month = thaiMonths[dateTime.month];
+  final shortYear = ((dateTime.year + 543) % 100).toString().padLeft(2, '0');
+  final hour = dateTime.hour.toString().padLeft(2, '0');
+  final minute = dateTime.minute.toString().padLeft(2, '0');
+  return '$day $month $shortYear $hour:$minute น.';
 }

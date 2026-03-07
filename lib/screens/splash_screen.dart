@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/services/auth_repository.dart';
+import 'package:nubbill/services/onboarding_state.dart';
 import 'package:nubbill/config/theme.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
@@ -27,9 +28,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final session = ref.read(authRepositoryProvider).currentSession;
 
     if (session != null) {
+      await OnboardingState.markLoggedInOnce();
+      if (!mounted) return;
       context.go('/home');
     } else {
-      context.go('/welcome');
+      final hasLoggedInOnce = await OnboardingState.hasLoggedInOnce();
+      if (!mounted) return;
+      context.go(hasLoggedInOnce ? '/welcome' : '/onboarding');
     }
   }
 

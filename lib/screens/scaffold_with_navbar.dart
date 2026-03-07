@@ -4,11 +4,6 @@ import 'package:go_router/go_router.dart';
 import 'package:nubbill/providers/notification_provider.dart';
 import 'package:nubbill/shared/app_icons.dart';
 
-/// Custom Navigation Bar matching the design prototype exactly
-/// - 4 items: กลุ่ม, เพื่อน, แจ้งเตือน, โปรไฟล์
-/// - Icon on top, text below (vertical layout)
-/// - Selected: blue icon + horizontal bar on top
-/// - Animated transitions when switching tabs
 class ScaffoldWithNavBar extends ConsumerWidget {
   final Widget navigationShell;
 

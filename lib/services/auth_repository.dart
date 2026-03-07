@@ -1,6 +1,7 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nubbill/config/supabase_config.dart';
+import 'package:nubbill/services/onboarding_state.dart';
 
 // Provider for AuthRepository
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
@@ -30,7 +31,13 @@ class AuthRepository {
   Session? get currentSession => _client.auth.currentSession;
   User? get currentUser => _client.auth.currentUser;
 
-  Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;
+  Stream<AuthState> get authStateChanges =>
+      _client.auth.onAuthStateChange.asyncMap((event) async {
+        if (event.session != null) {
+          await OnboardingState.markLoggedInOnce();
+        }
+        return event;
+      });
 
   Future<void> signInWithEmail(String email) async {
     await _client.auth.signInWithOtp(
