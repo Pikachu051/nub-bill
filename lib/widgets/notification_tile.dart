@@ -397,6 +397,9 @@ class _TrailingMeta extends StatelessWidget {
   }
 
   String _formatDateTime(DateTime dt) {
+    // createdAt is stored as UTC; convert to device local time before display.
+    final local = dt.toLocal();
+
     const thaiMonths = <String>[
       'ม.ค.',
       'ก.พ.',
@@ -412,12 +415,12 @@ class _TrailingMeta extends StatelessWidget {
       'ธ.ค.',
     ];
 
-    final monthLabel = thaiMonths[dt.month - 1];
-    final buddhistYearTwoDigits = (dt.year + 543) % 100;
-    final hour = dt.hour.toString().padLeft(2, '0');
-    final minute = dt.minute.toString().padLeft(2, '0');
+    final monthLabel = thaiMonths[local.month - 1];
+    final buddhistYearTwoDigits = (local.year + 543) % 100;
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
 
-    return '${dt.day} $monthLabel ${buddhistYearTwoDigits.toString().padLeft(2, '0')} $hour:$minute';
+    return '${local.day} $monthLabel ${buddhistYearTwoDigits.toString().padLeft(2, '0')} $hour:$minute';
   }
 }
 

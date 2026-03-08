@@ -120,11 +120,13 @@ class NotificationNotifier extends StateNotifier<NotificationState> {
           event: PostgresChangeEvent.insert,
           schema: 'public',
           table: 'notifications',
-          callback: (payload) {
-            final row = payload.newRecord;
-            final targetUserId = row['user_id']?.toString();
-            if (targetUserId != _userId) return;
-
+          // Server-side filter so RLS-gated tables deliver a populated newRecord.
+          filter: PostgresChangeFilter(
+            type: PostgresChangeFilterType.eq,
+            column: 'user_id',
+            value: _userId!,
+          ),
+          callback: (_) {
             // Pull from API to guarantee the same shape as list endpoint
             // (includes actor join fields) and avoid silent parse drift.
             refresh();
