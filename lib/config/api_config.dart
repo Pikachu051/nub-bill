@@ -10,7 +10,7 @@ import 'package:nubbill/config/supabase_config.dart';
 /// API configuration constants
 class ApiConfig {
   static const String _productionBaseUrl =
-      'https://nub-bill-backend.vercel.app';
+      'https://nub-bill-backend-production.up.railway.app';
 
   /// Base URL for the backend API.
   ///
