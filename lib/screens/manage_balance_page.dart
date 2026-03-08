@@ -8,6 +8,7 @@ import 'package:nubbill/services/expense_service.dart';
 import 'package:nubbill/services/friend_service.dart';
 import 'package:nubbill/services/payment_service.dart';
 import 'package:nubbill/services/trip_service.dart';
+import 'package:nubbill/models/debt_entry_model.dart';
 import 'package:nubbill/widgets/half_width_tab_indicator.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
 
@@ -43,6 +44,7 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
   Widget build(BuildContext context) {
     final tripDetailAsync = ref.watch(tripDetailProvider(widget.groupId));
     final expensesAsync = ref.watch(tripExpensesProvider(widget.groupId));
+    final debtsAsync = ref.watch(tripDebtsProvider(widget.groupId));
 
     return tripDetailAsync.when(
       loading: () =>
@@ -79,10 +81,20 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
             ),
           ),
           data: (expenses) {
+            final debtByCounterparty = <String, DebtEntry>{
+              for (final entry in debtsAsync.value ?? [])
+                if (entry.fromMemberId == myMemberId) entry.toMemberId: entry,
+            };
+            final collectDebtByFriend = <String, DebtEntry>{
+              for (final entry in debtsAsync.value ?? [])
+                if (entry.toMemberId == myMemberId) entry.fromMemberId: entry,
+            };
             final grouped = _groupFriendBalances(
               expenses: expenses,
               myMemberId: myMemberId,
               memberById: memberById,
+              debtByCounterparty: debtByCounterparty,
+              collectDebtByFriend: collectDebtByFriend,
             );
 
             return Scaffold(
@@ -198,6 +210,7 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
                               friendAvatarUrl: summary.avatarUrl,
                               bills: summary.bills,
                               counterSplitIds: summary.counterSplitIds,
+                              allForwardSplitIds: summary.allForwardSplitIds,
                             ),
                           ),
                         );
@@ -279,21 +292,24 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
 
     try {
       final paymentService = ref.read(paymentServiceProvider);
+      final settlementSplitIds = summary.allForwardSplitIds.isNotEmpty
+          ? summary.allForwardSplitIds
+          : summary.bills.map((bill) => bill.splitId).toList();
+
       final settlementId = await paymentService.createSettlementForManualVerify(
         payerMemberId: summary.memberId,
         payeeMemberId: myMemberId,
         tripId: widget.groupId,
         amount: summary.totalAmount,
-        expenseSplitIds: summary.bills.map((bill) => bill.splitId).toList(),
+        expenseSplitIds: settlementSplitIds,
       );
 
       await paymentService.manualVerify(settlementId: settlementId);
 
       if (!mounted) return;
       setState(() {
-        _locallyVerifiedSplitIds.addAll(
-          summary.bills.map((bill) => bill.splitId),
-        );
+        _locallyVerifiedSplitIds.addAll(settlementSplitIds);
+        _locallyVerifiedSplitIds.addAll(summary.counterSplitIds);
       });
 
       ref.invalidate(tripExpensesProvider(widget.groupId));
@@ -484,6 +500,8 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
     required List<Expense> expenses,
     required String myMemberId,
     required Map<String, TripMember> memberById,
+    Map<String, DebtEntry> debtByCounterparty = const {},
+    Map<String, DebtEntry> collectDebtByFriend = const {},
   }) {
     final oweMap = <String, _FriendDebtAccumulator>{};
     final collectMap = <String, _FriendDebtAccumulator>{};
@@ -547,6 +565,9 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
     // Track split IDs from cancelled counter-obligations so they can be
     // marked paid together with the forward splits.
     final counterSplitsByFriend = <String, List<String>>{};
+    // Track ALL forward split IDs (before netting reduction) so the settlement
+    // can mark every related split as paid, including the "cancelled" ones.
+    final allForwardSplitsByFriend = <String, List<String>>{};
 
     for (final friendId in allFriendIds) {
       final oweAcc = oweMap[friendId];
@@ -561,7 +582,9 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
         oweMap.remove(friendId);
         collectMap.remove(friendId);
       } else if (oweTotal > collectTotal) {
-        // I still owe net: remove from collect; reduce owe bills greedily
+        // I still owe net: remove from collect; reduce owe bills greedily.
+        // Save the FULL forward split list BEFORE subtractAmount drops entries.
+        allForwardSplitsByFriend[friendId] = oweAcc.allSplitIds;
         counterSplitsByFriend[friendId] = collectAcc.allSplitIds;
         collectMap.remove(friendId);
         oweMap[friendId] = oweAcc.subtractAmount(collectTotal);
@@ -575,10 +598,18 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
     List<_FriendDebtSummary> toSortedList(
       Map<String, _FriendDebtAccumulator> source, {
       Map<String, List<String>>? counterSplits,
+      Map<String, List<String>>? allForwardSplits,
+      Map<String, DebtEntry>? backendLookup,
     }) {
       final list = source.entries.map((entry) {
+        final backend = backendLookup?[entry.key];
         return entry.value.toSummary(
-          counterSplitIds: counterSplits?[entry.key] ?? [],
+          counterSplitIds: backend?.counterExpenseSplitIds
+              ?? counterSplits?[entry.key]
+              ?? [],
+          allForwardSplitIds: backend?.expenseSplitIds
+              ?? allForwardSplits?[entry.key]
+              ?? [],
         );
       }).toList();
       list.sort((a, b) {
@@ -590,8 +621,16 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
     }
 
     return _GroupedSummaries(
-      oweSummaries: toSortedList(oweMap, counterSplits: counterSplitsByFriend),
-      collectSummaries: toSortedList(collectMap),
+      oweSummaries: toSortedList(
+        oweMap,
+        counterSplits: counterSplitsByFriend,
+        allForwardSplits: allForwardSplitsByFriend,
+        backendLookup: debtByCounterparty,
+      ),
+      collectSummaries: toSortedList(
+        collectMap,
+        backendLookup: collectDebtByFriend,
+      ),
     );
   }
 
@@ -906,6 +945,10 @@ class _FriendDebtSummary {
   final List<FriendBillItem> bills;
   final double totalAmount;
   final List<String> counterSplitIds;
+  /// All forward split IDs before netting reduction. When non-empty, the
+  /// settlement must use these instead of just the visible bill split IDs so
+  /// that every related debt is properly cleared in the database.
+  final List<String> allForwardSplitIds;
 
   const _FriendDebtSummary({
     required this.memberId,
@@ -915,6 +958,7 @@ class _FriendDebtSummary {
     required this.bills,
     required this.totalAmount,
     this.counterSplitIds = const [],
+    this.allForwardSplitIds = const [],
   });
 
   int get billCount => bills.length;
@@ -983,7 +1027,10 @@ class _FriendDebtAccumulator {
     return result;
   }
 
-  _FriendDebtSummary toSummary({List<String> counterSplitIds = const []}) {
+  _FriendDebtSummary toSummary({
+    List<String> counterSplitIds = const [],
+    List<String> allForwardSplitIds = const [],
+  }) {
     return _FriendDebtSummary(
       memberId: memberId,
       name: name,
@@ -992,6 +1039,7 @@ class _FriendDebtAccumulator {
       bills: List<FriendBillItem>.unmodifiable(_bills),
       totalAmount: _totalAmount,
       counterSplitIds: counterSplitIds,
+      allForwardSplitIds: allForwardSplitIds,
     );
   }
 }

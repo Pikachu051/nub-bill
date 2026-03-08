@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/config/router.dart';
 import 'package:nubbill/config/theme.dart';
+import 'package:nubbill/providers/notification_provider.dart';
+import 'package:nubbill/services/auth_repository.dart';
 import 'package:nubbill/services/deep_link_service.dart';
 import 'package:nubbill/services/notification_service.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
@@ -18,12 +23,37 @@ class App extends ConsumerStatefulWidget {
   ConsumerState<App> createState() => _AppState();
 }
 
-class _AppState extends ConsumerState<App> {
+class _AppState extends ConsumerState<App> with WidgetsBindingObserver {
   bool _deepLinkInitialized = false;
   bool _notificationInitialized = false;
+  bool _authListenerInitialized = false;
+  StreamSubscription<AuthState>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !_notificationInitialized) {
+      return;
+    }
+
+    // Realtime inserts can be missed while the app is backgrounded.
+    // Force a refresh on resume so notifications/badge stay up to date.
+    final userId = ref.read(authUserIdProvider);
+    if (userId != null) {
+      ref.read(notificationProvider.notifier).refresh();
+      NotificationService.syncPushToken().catchError((_) {});
+    }
+  }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _authSub?.cancel();
     if (_deepLinkInitialized) {
       ref.read(deepLinkServiceProvider).dispose();
     }
@@ -55,6 +85,20 @@ class _AppState extends ConsumerState<App> {
         ),
       ),
       data: (_) {
+        if (!_authListenerInitialized) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted || _authListenerInitialized) return;
+
+            _authSub = ref.read(authRepositoryProvider).authStateChanges.listen((state) {
+              if (state.session != null) {
+                NotificationService.syncPushToken().catchError((_) {});
+              }
+            });
+
+            setState(() => _authListenerInitialized = true);
+          });
+        }
+
         if (!_deepLinkInitialized) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (!mounted || _deepLinkInitialized) return;

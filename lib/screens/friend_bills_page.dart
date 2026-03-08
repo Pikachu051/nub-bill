@@ -29,6 +29,10 @@ class FriendBillsPage extends StatefulWidget {
   final String? friendAvatarUrl;
   final List<FriendBillItem> bills;
   final List<String> counterSplitIds;
+  /// All forward split IDs before debt-netting reduction. When provided and
+  /// the user pays the full net amount, the settlement uses these IDs so every
+  /// related debt (including the "cancelled" smaller bills) is marked paid.
+  final List<String> allForwardSplitIds;
 
   const FriendBillsPage({
     super.key,
@@ -38,6 +42,7 @@ class FriendBillsPage extends StatefulWidget {
     this.friendAvatarUrl,
     required this.bills,
     this.counterSplitIds = const [],
+    this.allForwardSplitIds = const [],
   });
 
   @override
@@ -94,6 +99,14 @@ class _FriendBillsPageState extends State<FriendBillsPage> {
       return;
     }
 
+    // When paying the full net amount, use allForwardSplitIds (the complete
+    // list of forward splits before netting reduction) so that every related
+    // debt — including bills that were "cancelled" during netting — is properly
+    // marked paid in the database. For partial payments keep the selected IDs.
+    final effectiveForwardIds = _allSelected && widget.allForwardSplitIds.isNotEmpty
+        ? widget.allForwardSplitIds
+        : _selectedSplitIds.toList();
+
     final result = await context.push<bool?>(
       '/payment',
       extra: {
@@ -102,7 +115,7 @@ class _FriendBillsPageState extends State<FriendBillsPage> {
         'tripId': widget.groupId,
         'payeeName': widget.friendName,
         'payeeAvatarUrl': widget.friendAvatarUrl,
-        'expenseSplitIds': _selectedSplitIds.toList(),
+        'expenseSplitIds': effectiveForwardIds,
         if (_allSelected && widget.counterSplitIds.isNotEmpty)
           'counterExpenseSplitIds': widget.counterSplitIds,
       },

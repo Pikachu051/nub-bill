@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 
 import 'package:nubbill/config/api_config.dart';
 import 'package:nubbill/config/router.dart';
+import 'package:nubbill/config/supabase_config.dart';
 
 // Top-level handler required by firebase_messaging for background isolate.
 @pragma('vm:entry-point')
@@ -97,7 +98,7 @@ class NotificationService {
     }
 
     // Register this device's push token with the backend
-    await _registerToken();
+    await syncPushToken();
     FirebaseMessaging.instance.onTokenRefresh.listen(_saveToken);
   }
 
@@ -147,21 +148,33 @@ class NotificationService {
   // Token registration
   // ---------------------------------------------------------------------------
 
-  static Future<void> _registerToken() async {
+  static Future<void> syncPushToken() async {
     final token = await FirebaseMessaging.instance.getToken();
     if (token != null) await _saveToken(token);
   }
 
   static Future<void> _saveToken(String token) async {
     try {
+      // Push token mapping is user-scoped; skip until user session exists.
+      if (SupabaseConfig.client.auth.currentSession == null) {
+        return;
+      }
+
       final platform = Platform.isIOS ? 'ios' : 'android';
       final client = ApiClient();
-      await client.post(
+      final response = await client.post(
         '/notifications/push-token',
         body: {'token': token, 'platform': platform},
       );
-    } catch (_) {
-      // Token registration is best-effort; failures are non-fatal
+
+      if (!response.isSuccess) {
+        debugPrint(
+          'Push token registration failed: status=${response.statusCode}, error=${response.error}',
+        );
+      }
+    } catch (e) {
+      // Token registration is best-effort; failures are non-fatal.
+      debugPrint('Push token registration exception: $e');
     }
   }
 }
