@@ -150,6 +150,28 @@ class ExpenseService {
     return response.data as Map<String, dynamic>;
   }
 
+  /// POST /api/expenses/:id/reverse-settlements-for-edit
+  Future<Map<String, dynamic>> reverseSettlementsForEdit(
+    String expenseId, {
+    String? reason,
+  }) async {
+    final body = <String, dynamic>{};
+    if (reason != null && reason.trim().isNotEmpty) {
+      body['reason'] = reason.trim();
+    }
+
+    final response = await _client.post(
+      '/expenses/$expenseId/reverse-settlements-for-edit',
+      body: body,
+    );
+
+    if (!response.isSuccess || response.data == null) {
+      throw Exception(response.error ?? 'Failed to reverse settlements');
+    }
+
+    return response.data as Map<String, dynamic>;
+  }
+
   /// DELETE /api/expenses/:id - Delete expense
   Future<void> deleteExpense(String expenseId) async {
     final response = await _client.delete('/expenses/$expenseId');

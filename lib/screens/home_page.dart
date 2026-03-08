@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:nubbill/services/auth_repository.dart';
 import 'package:nubbill/services/profile_service.dart';
 import 'package:nubbill/models/trip_model.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
 
@@ -185,11 +186,56 @@ final walletSummaryProvider = FutureProvider.autoDispose<Map<String, double>>((
   }
 });
 
-class HomePage extends ConsumerWidget {
+class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends ConsumerState<HomePage> {
+  RealtimeChannel? _homeRealtimeChannel;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _subscribeToWalletUpdates();
+    });
+  }
+
+  void _subscribeToWalletUpdates() {
+    _homeRealtimeChannel = SupabaseConfig.client
+        .channel('home-wallet-updates')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'expense_splits',
+          callback: (_) => _refreshWallet(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'settlements',
+          callback: (_) => _refreshWallet(),
+        )
+        .subscribe();
+  }
+
+  void _refreshWallet() {
+    if (!mounted) return;
+    ref.invalidate(userTripsProvider);
+    ref.invalidate(walletSummaryProvider);
+  }
+
+  @override
+  void dispose() {
+    _homeRealtimeChannel?.unsubscribe();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(authRepositoryProvider).currentUser;
     final profileAsync = ref.watch(myProfileProvider);
 

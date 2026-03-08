@@ -42,6 +42,9 @@ class BillDetailsPage extends ConsumerWidget {
 
         final canManageExpense =
             currentUserId != null && detail.createdBy == currentUserId;
+        final hasLinkedSettlements = detail.settlements.any(
+          (settlement) => settlement.status != 'rejected',
+        );
         final memberNameById = {
           for (final split in detail.splits) split.memberId: split.displayName,
         };
@@ -53,6 +56,50 @@ class BillDetailsPage extends ConsumerWidget {
                   IconButton(
                     icon: const Icon(AppIcons.edit, color: Color(0xFF81CEF2)),
                     onPressed: () async {
+                      if (hasLinkedSettlements) {
+                        final shouldReverse = await _showReverseForEditDialog(
+                          context,
+                        );
+                        if (!shouldReverse || !context.mounted) {
+                          return;
+                        }
+
+                        try {
+                          final result = await ref
+                              .read(expenseServiceProvider)
+                              .reverseSettlementsForEdit(
+                                detail.id,
+                                reason: 'expense_edit_requested_by_creator',
+                              );
+
+                          if (!context.mounted) return;
+                          final reversedCount =
+                              (result['reversed_settlement_count'] as num?)
+                                  ?.toInt() ??
+                              0;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                reversedCount > 0
+                                    ? 'ย้อนรายการชำระ $reversedCount รายการแล้ว สามารถแก้ไขบิลได้'
+                                    : 'ไม่พบรายการชำระที่ต้องย้อน',
+                              ),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          ref.invalidate(expenseDetailProvider(expenseId));
+                        } catch (error) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('ไม่สามารถย้อนรายการชำระได้: $error'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
+                          return;
+                        }
+                      }
+
                       final updated = await context.push<bool>(
                         '/add_expense',
                         extra: {
@@ -93,6 +140,33 @@ class BillDetailsPage extends ConsumerWidget {
         );
       },
     );
+  }
+
+  Future<bool> _showReverseForEditDialog(BuildContext context) async {
+    final result = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.42),
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('ย้อนรายการชำระก่อนแก้ไขบิล?'),
+          content: const Text(
+            'ระบบจะย้อนสถานะการชำระเงินที่ผูกกับบิลนี้และบันทึกประวัติการย้อนรายการไว้ จากนั้นคุณจะแก้ไขบิลได้',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('ยกเลิก'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('ย้อนแล้วแก้ไขต่อ'),
+            ),
+          ],
+        );
+      },
+    );
+
+    return result ?? false;
   }
 
   Scaffold _buildScaffold(
