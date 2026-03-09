@@ -44,12 +44,12 @@
 
 | | |
 |:---:|:---:|
-| ![Smart Expense Recording](docs/screenshots/1000014700.jpg) | ![Trip & Member Overview](docs/screenshots/1000014702.jpg) |
-| **Smart Expense Recording** — บันทึกรายการ ระบุผู้จ่ายและผู้หาร | **Trip & Member Overview** — ภาพรวมทริปและสมาชิก |
+| ![Smart Expense Recording](docs/screenshots/1000014700.jpg) | ![Sub-Group Management](docs/screenshots/1000014702.jpg) |
+| **Smart Expense Recording** — บันทึกรายการ ระบุผู้จ่ายและผู้หาร | **Sub-Group Management** — จัดการกลุ่มย่อย หารเฉพาะกลุ่มได้ |
 | ![Auto Debt Simplification](docs/screenshots/1000014704.jpg) | ![PromptPay QR Generation](docs/screenshots/1000014706.jpg) |
-| **Auto Debt Simplification** — คำนวณยอดสุทธิ หักลบกลบหนี้อัตโนมัติ | **PromptPay QR Generation** — สร้าง QR Code รับเงิน |
+| **Auto Debt Simplification** — คำนวณยอดสุทธิ หักลบกลบหนี้อัตโนมัติ | **Trip & Member Overview** — ภาพรวมทริปและสมาชิก |
 | ![Slip Verification](docs/screenshots/1000014708.jpg) | ![Sub-Group Management](docs/screenshots/Screenshot%202026-03-10%20001238.png) |
-| **Slip Verification** — ตรวจสอบสลิปโอนเงินผ่าน SlipOK | **Sub-Group Management** — จัดการกลุ่มย่อย หารเฉพาะกลุ่มได้ |
+| **Deep Link / QR Trip Invitation** — ชวนเพื่อนด้วย QR หรือ Deep Link | **PromptPay QR Generation** — สร้าง QR Code รับเงิน + **Slip Verification** — ตรวจสอบสลิปโอนเงินผ่าน Thunder Solution |
 
 ---
 
