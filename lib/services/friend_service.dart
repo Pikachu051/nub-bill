@@ -284,28 +284,12 @@ class FriendService {
 
   /// Send friend request by user ID
   Future<void> sendRequestById(String otherId) async {
-    // Ensure user_a < user_b (schema constraint)
-    final userA = _userId.compareTo(otherId) < 0 ? _userId : otherId;
-    final userB = _userId.compareTo(otherId) < 0 ? otherId : _userId;
+    final response = await _api.post('/friends/request/$otherId');
 
-    // Check if friendship already exists
-    final existing = await _supabase
-        .from('friendships')
-        .select('id')
-        .eq('user_a', userA)
-        .eq('user_b', userB)
-        .maybeSingle();
-
-    if (existing != null) {
-      throw Exception('มีคำขอหรือเป็นเพื่อนอยู่แล้ว');
+    if (!response.isSuccess) {
+      final msg = response.error ?? 'ไม่สามารถส่งคำขอเป็นเพื่อนได้';
+      throw Exception(msg);
     }
-
-    await _supabase.from('friendships').insert({
-      'user_a': userA,
-      'user_b': userB,
-      'initiated_by': _userId,
-      'status': 'pending',
-    });
   }
 
   /// Accept friend request
