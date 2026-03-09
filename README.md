@@ -9,6 +9,14 @@
 [![License](https://img.shields.io/badge/License-MIT-green)](./LICENSE)
 [![Status](https://img.shields.io/badge/Status-In%20Development-orange)]()
 
+## 🎥 Demo Video
+
+[![Demo Video](https://img.youtube.com/vi/X9-zET5074U/maxresdefault.jpg)](https://youtu.be/X9-zET5074U)
+
+> คลิกที่รูปด้านบนเพื่อดูวิดีโอสาธิตการใช้งานบน YouTube
+
+---
+
 ## Introduction
 
 **Nub-Bill** (หรือ "นับบิล") เกิดขึ้นเพื่อแก้ปัญหาความซับซ้อนทางการเงินเมื่อออกทริปเป็นกลุ่ม (Group Travel) ซึ่งมักมีผู้สำรองจ่ายหลายคน และตัวหารในแต่ละรายการไม่เท่ากัน (เช่น ค่าเดินทางหารเฉพาะคนนั่งรถ, ค่าอาหารหารเฉพาะคนกิน) การใช้ Spreadsheet แบบเดิมมีความยุ่งยากในการกรอกข้อมูล และเมื่อจบทริปมักเกิดความสับสนในการเคลียร์หนี้ อีกทั้งยังขาดระบบตรวจสอบสลิปการโอนเงินที่น่าเชื่อถือ
@@ -25,6 +33,25 @@
 - [ ] **Negative Balance Support:** รองรับยอดเงินติดลบสำหรับกรณีได้รับเงินคืน (Cashback/Refund) เพื่อหักลบกับค่าใช้จ่ายรวมได้อย่างถูกต้อง
 - [ ] **Quick Invite:** เชิญเพื่อนเข้าทริปผ่าน QR Code หรือ Deep Link โดยไม่ต้องค้นหา Username
 - [ ] **Visual Summary:** สร้างรูปภาพสรุปยอดหนี้สินของแต่ละคน เพื่อส่งเข้า LINE/Messenger ได้ทันที
+
+### Nice-to-have Features (Future Roadmap)
+
+---
+
+## 📱 Screenshots
+
+### Core Features in Action
+
+| | |
+|:---:|:---:|
+| ![Smart Expense Recording](docs/screenshots/1000014700.jpg) | ![Trip & Member Overview](docs/screenshots/1000014702.jpg) |
+| **Smart Expense Recording** — บันทึกรายการ ระบุผู้จ่ายและผู้หาร | **Trip & Member Overview** — ภาพรวมทริปและสมาชิก |
+| ![Auto Debt Simplification](docs/screenshots/1000014704.jpg) | ![PromptPay QR Generation](docs/screenshots/1000014706.jpg) |
+| **Auto Debt Simplification** — คำนวณยอดสุทธิ หักลบกลบหนี้อัตโนมัติ | **PromptPay QR Generation** — สร้าง QR Code รับเงิน |
+| ![Slip Verification](docs/screenshots/1000014708.jpg) | ![Sub-Group Management](docs/screenshots/Screenshot%202026-03-10%20001238.png) |
+| **Slip Verification** — ตรวจสอบสลิปโอนเงินผ่าน SlipOK | **Sub-Group Management** — จัดการกลุ่มย่อย หารเฉพาะกลุ่มได้ |
+
+---
 
 ### Nice-to-have Features (Future Roadmap)
 - [ ] **AI Receipt Scanning (OCR):** ใช้ Google ML Kit สแกนใบเสร็จยาวๆ แปลงเป็นรายการ Digital
