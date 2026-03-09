@@ -294,30 +294,18 @@ class FriendService {
 
   /// Accept friend request
   Future<void> acceptRequest(String requesterId) async {
-    final userA = _userId.compareTo(requesterId) < 0 ? _userId : requesterId;
-    final userB = _userId.compareTo(requesterId) < 0 ? requesterId : _userId;
-
-    await _supabase
-        .from('friendships')
-        .update({'status': 'accepted'})
-        .eq('user_a', userA)
-        .eq('user_b', userB)
-        .eq('initiated_by', requesterId)
-        .eq('status', 'pending');
+    final response = await _api.post('/friends/$requesterId/accept');
+    if (!response.isSuccess) {
+      throw Exception(response.error ?? 'ไม่สามารถยืนยันคำขอเป็นเพื่อนได้');
+    }
   }
 
   /// Reject friend request
   Future<void> rejectRequest(String requesterId) async {
-    final userA = _userId.compareTo(requesterId) < 0 ? _userId : requesterId;
-    final userB = _userId.compareTo(requesterId) < 0 ? requesterId : _userId;
-
-    await _supabase
-        .from('friendships')
-        .delete()
-        .eq('user_a', userA)
-        .eq('user_b', userB)
-        .eq('initiated_by', requesterId)
-        .eq('status', 'pending');
+    final response = await _api.post('/friends/$requesterId/reject');
+    if (!response.isSuccess) {
+      throw Exception(response.error ?? 'ไม่สามารถปฏิเสธคำขอเป็นเพื่อนได้');
+    }
   }
 
   /// Remove friend
