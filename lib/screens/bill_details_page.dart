@@ -225,7 +225,7 @@ class BillDetailsPage extends ConsumerWidget {
             ),
             child: Icon(
               detail.category.icon,
-              color: const Color(0xFF141416),
+              color: Colors.white,
               size: 28,
             ),
           ),

@@ -18,13 +18,21 @@
 ## Features
 
 ### MVP Features (Core Functionality)
-- [ ] **Smart Expense Recording:** บันทึกรายการจ่ายเงินระบุ "คนจ่าย" และ "คนหาร" ได้อย่างอิสระ
-- [ ] **Sub-Group Management:** แก้ปัญหาค่าเดินทาง/น้ำมัน โดยการตั้ง Group ย่อย (เช่น กลุ่มรถคันที่ 1, กลุ่มรถคันที่ 2) เลือกหารเฉพาะกลุ่มได้ในคลิกเดียว
-- [ ] **Auto Debt Simplification:** คำนวณยอดสุทธิอัตโนมัติ หักลบกลบหนี้ระหว่างกันเพื่อลดจำนวน Transaction การโอนให้เหลือน้อยที่สุด
-- [ ] **PromptPay QR & Slip Verification:** (Highlight Feature) ระบบสร้าง QR Code รับเงินและตรวจสอบสลิป
-- [ ] **Negative Balance Support:** รองรับยอดเงินติดลบสำหรับกรณีได้รับเงินคืน (Cashback/Refund) เพื่อหักลบกับค่าใช้จ่ายรวมได้อย่างถูกต้อง
-- [ ] **Quick Invite:** เชิญเพื่อนเข้าทริปผ่าน QR Code หรือ Deep Link โดยไม่ต้องค้นหา Username
-- [ ] **Visual Summary:** สร้างรูปภาพสรุปยอดหนี้สินของแต่ละคน เพื่อส่งเข้า LINE/Messenger ได้ทันที
+
+| | | |
+|:---:|:---:|:---:|
+| ![Trip Overview](docs/screenshots/trip_detail.jpg) | ![Create Bill](docs/screenshots/create_bill_itemized.jpg) | ![Select Payer](docs/screenshots/select_payer.jpg) |
+| **ภาพรวมทริป & รายการค่าใช้จ่าย** | **บันทึกรายการแบบแยกรายการ** | **เลือกผู้จ่ายและยอดเงิน** |
+| ![PromptPay QR](docs/screenshots/payment_qr.jpg) | ![Visual Summary](docs/screenshots/summary.jpg) | ![Group Invite](docs/screenshots/group_invite_qr.jpg) |
+| **สร้าง PromptPay QR & ตรวจสอบสลิป** | **สรุปยอดค่าใช้จ่ายพร้อมกราฟ** | **เชิญเพื่อนผ่าน QR Code / ลิงก์** |
+
+- [x] **Smart Expense Recording:** บันทึกรายการจ่ายเงินระบุ "คนจ่าย" และ "คนหาร" ได้อย่างอิสระ พร้อมระบุหมวดหมู่และแยกรายการย่อย (Itemized)
+- [x] **Sub-Group Management:** แก้ปัญหาค่าเดินทาง/น้ำมัน โดยการตั้ง Group ย่อย (เช่น กลุ่มรถคันที่ 1, กลุ่มรถคันที่ 2) เลือกหารเฉพาะกลุ่มได้ในคลิกเดียว
+- [x] **Auto Debt Simplification:** คำนวณยอดสุทธิอัตโนมัติ หักลบกลบหนี้ระหว่างกันเพื่อลดจำนวน Transaction การโอนให้เหลือน้อยที่สุด
+- [x] **PromptPay QR & Slip Verification:** (Highlight Feature) ระบบสร้าง QR Code รับเงินตามมาตรฐาน EMVCo และตรวจสอบสลิปผ่าน SlipOK API
+- [x] **Negative Balance Support:** รองรับยอดเงินติดลบสำหรับกรณีได้รับเงินคืน (Cashback/Refund) เพื่อหักลบกับค่าใช้จ่ายรวมได้อย่างถูกต้อง
+- [x] **Quick Invite:** เชิญเพื่อนเข้าทริปผ่าน QR Code หรือ Deep Link โดยไม่ต้องค้นหา Username
+- [x] **Visual Summary:** สรุปยอดค่าใช้จ่ายด้วยกราฟวงกลมแยกหมวดหมู่ แสดงส่วนแบ่งของแต่ละคนในทริป
 
 ### Nice-to-have Features (Future Roadmap)
 - [ ] **AI Receipt Scanning (OCR):** ใช้ Google ML Kit สแกนใบเสร็จยาวๆ แปลงเป็นรายการ Digital
@@ -82,3 +90,25 @@
 * **Data Consistency:** ข้อมูลยอดเงินต้องตรงกันทุกเครื่องแบบ Real-time (Eventual Consistency via Websocket).
 * **Precision:** การคำนวณทศนิยม 2 ตำแหน่งมีความแม่นยำสูง (Double-entry principle).
 * **Security:** API Keys ของ Third-party ต้องไม่ถูกฝังใน Source Code ของแอปพลิเคชัน
+
+---
+
+## Getting Started
+
+### Prerequisites
+* Flutter SDK 3.x
+* Dart SDK (ตาม Flutter)
+* Bun 1.x (สำหรับ backend)
+* Android Studio หรือ Xcode (สำหรับ emulator/simulator)
+
+### Run Frontend (`nub-bill/`)
+
+1. เปิด terminal ที่โฟลเดอร์ `nub-bill`
+2. ติดตั้ง dependency:
+    ```bash
+    flutter pub get
+    ```
+3. รันแบบปกติ (ใช้ backend ที่ host ไว้บน Railway):
+    ```bash
+    flutter run
+    ```

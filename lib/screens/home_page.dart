@@ -8,6 +8,7 @@ import 'package:nubbill/models/trip_model.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
+import 'package:nubbill/widgets/group_quick_actions_fab.dart';
 
 /// Provider for user's groups directly from Supabase
 final userTripsProvider = FutureProvider.autoDispose<List<Trip>>((ref) async {
@@ -260,7 +261,9 @@ class _HomePageState extends ConsumerState<HomePage> {
     const baselineTopInset = 24.0;
     final topInset = MediaQuery.paddingOf(context).top;
     // Keep phone layout as baseline and push card/spacer down only on taller insets.
-    final extraTopInset = (topInset - baselineTopInset).clamp(0.0, 48.0).toDouble();
+    final extraTopInset = (topInset - baselineTopInset)
+        .clamp(0.0, 48.0)
+        .toDouble();
     final walletTop = baseWalletTop + extraTopInset;
     final walletOverlapSpacer = baseOverlapSpacer + extraTopInset;
 
@@ -388,35 +391,9 @@ class _HomePageState extends ConsumerState<HomePage> {
           ),
         ),
       ),
-      // FAB for creating new group
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'createGroupFab',
-        onPressed: () => context.push('/groups/create'),
-        backgroundColor: const Color(0xFF81CEF2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-        icon: const Icon(AppIcons.people, color: Colors.white),
-        label: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: const [
-            Text(
-              'สร้างกลุ่มใหม่',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(width: 8),
-            Text(
-              '|',
-              style: TextStyle(
-                color: Colors.white70,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            SizedBox(width: 8),
-            Icon(AppIcons.chevronUp, color: Colors.white, size: 24),
-          ],
-        ),
+      floatingActionButton: GroupQuickActionsFab(
+        onCreateGroup: () => context.push('/groups/create'),
+        onJoinedGroup: _refreshWallet,
       ),
     );
   }
@@ -559,9 +536,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
         // Filter icon (from design)
         IconButton(
-          onPressed: () {
-            // TODO: Show filter options
-          },
+          onPressed: () {},
           icon: Icon(AppIcons.tune, color: Colors.grey[600]),
         ),
       ],
@@ -627,11 +602,11 @@ class _HomePageState extends ConsumerState<HomePage> {
         ? 'รอรับเงิน'
         : (isNegative ? 'ค้างจ่าย' : 'เคลียร์');
     final statusColor = isPositive
-      ? const Color(0xFF4CAF50)
-      : (isNegative ? const Color(0xFFFF5252) : Colors.grey[500]);
+        ? const Color(0xFF4CAF50)
+        : (isNegative ? const Color(0xFFFF5252) : Colors.grey[500]);
     final amountColor = isPositive
-      ? const Color(0xFF3DCB57)
-      : (isNegative ? const Color(0xFFFF5252) : Colors.grey[500]);
+        ? const Color(0xFF3DCB57)
+        : (isNegative ? const Color(0xFFFF5252) : Colors.grey[500]);
 
     return Card(
       elevation: 0,

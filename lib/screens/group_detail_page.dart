@@ -380,20 +380,8 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                 size: 20,
               ),
               onPressed: () async {
-                if (detail.myRole != 'admin') {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'เฉพาะผู้ดูแลกลุ่มเท่านั้นที่แก้ไขข้อมูลกลุ่มได้',
-                      ),
-                    ),
-                  );
-                  return;
-                }
-
                 final updated = await context.push<bool>(
-                  '/groups/create',
-                  extra: {'trip': trip, 'members': members},
+                  '/groups/${widget.groupId}/settings',
                 );
 
                 if (!mounted) return;
@@ -868,7 +856,10 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                   child: IconButton(
                     padding: const EdgeInsets.all(12),
                     onPressed: () {
-                      // Show chart/summary
+                      context.push(
+                        '/group-overview',
+                        extra: {'groupId': widget.groupId},
+                      );
                     },
                     icon: const Icon(
                       AppIcons.barChart,
@@ -1249,7 +1240,7 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
                 child: Icon(
                   expense.categoryIcon,
                   size: 22,
-                  color: const Color(0xFF141416),
+                  color: Colors.white,
                 ),
               ),
               const SizedBox(width: 12),

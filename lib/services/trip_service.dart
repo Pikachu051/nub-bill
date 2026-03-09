@@ -155,7 +155,14 @@ class TripService {
 
   /// POST /api/trips/join - Join trip via code
   Future<String> joinTripByCode(String code) async {
-    final response = await _client.post('/trips/join', body: {'code': code});
+    final raw = code.trim();
+    final extracted = RegExp(r'join/([A-Za-z0-9]{4,20})', caseSensitive: false)
+            .firstMatch(raw)
+            ?.group(1) ??
+        raw;
+    final normalized = extracted.toUpperCase().replaceAll(RegExp(r'\s+'), '');
+
+    final response = await _client.post('/trips/join', body: {'code': normalized});
 
     if (!response.isSuccess || response.data == null) {
       throw Exception(response.error ?? 'Failed to join trip');
@@ -257,6 +264,17 @@ class TripService {
 
     if (!response.isSuccess) {
       throw Exception(response.error ?? 'Failed to remove member');
+    }
+  }
+
+  /// POST /api/trips/:id/members/:memberId/make-admin - Grant admin role
+  Future<void> makeAdmin(String tripId, String memberId) async {
+    final response = await _client.post(
+      '/trips/$tripId/members/$memberId/make-admin',
+    );
+
+    if (!response.isSuccess) {
+      throw Exception(response.error ?? 'Failed to grant admin role');
     }
   }
 

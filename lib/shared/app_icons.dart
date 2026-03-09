@@ -73,8 +73,12 @@ abstract final class AppIcons {
   // ── Category / Trip ──
   static const IconData flight = LucideIcons.plane;
   static const IconData flightTakeoff = LucideIcons.planeTakeoff;
+  static const IconData travel = LucideIcons.planeTakeoff;
   static const IconData hotel = LucideIcons.hotel;
   static const IconData restaurant = LucideIcons.utensilsCrossed;
+  static const IconData shopping = LucideIcons.shoppingBag;
+  static const IconData health = LucideIcons.stethoscope;
+  static const IconData pet = LucideIcons.pawPrint;
   static const IconData favorite = LucideIcons.heart;
   static const IconData category = LucideIcons.layoutGrid;
   static const IconData car = LucideIcons.car;

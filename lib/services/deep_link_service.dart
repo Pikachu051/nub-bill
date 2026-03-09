@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/services/friend_service.dart';
+import 'package:nubbill/services/trip_service.dart';
 import 'package:nubbill/config/supabase_config.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -56,7 +57,7 @@ class DeepLinkService {
     try {
       final uri = await _appLinks.getInitialLink();
       if (uri != null) {
-        _handleDeepLink(uri);
+        _handleDeepLink(uri, fromInitialLink: true);
       }
     } catch (e) {
       debugPrint('Error getting initial link: $e');
@@ -64,23 +65,52 @@ class DeepLinkService {
   }
 
   /// Handle incoming deep link
-  void _handleDeepLink(Uri uri) {
+  void _handleDeepLink(Uri uri, {bool fromInitialLink = false}) {
     debugPrint('Received deep link: $uri');
 
     if (uri.scheme == 'nubbill') {
+      final host = uri.host;
       final pathSegments = uri.pathSegments;
 
-      // nubbill://friend/add/{userId}
-      if (pathSegments.length >= 3 &&
-          pathSegments[0] == 'friend' &&
-          pathSegments[1] == 'add') {
-        final userId = pathSegments[2];
-        _handleAddFriend(userId);
+      // Support both:
+      // - nubbill://friend/add/{userId}
+      // - nubbill:/friend/add/{userId}
+      final isFriendInvite =
+          (host == 'friend' &&
+              pathSegments.length >= 2 &&
+              pathSegments[0] == 'add') ||
+          (pathSegments.length >= 3 &&
+              pathSegments[0] == 'friend' &&
+              pathSegments[1] == 'add');
+
+      if (isFriendInvite) {
+        final userId = host == 'friend' ? pathSegments[1] : pathSegments[2];
+        _handleAddFriend(userId.trim());
+        return;
+      }
+
+      // Support both:
+      // - nubbill://trip/join/{joinCode}
+      // - nubbill:/trip/join/{joinCode}
+      final isTripJoin =
+          (host == 'trip' &&
+              pathSegments.length >= 2 &&
+              pathSegments[0] == 'join') ||
+          (pathSegments.length >= 3 &&
+              pathSegments[0] == 'trip' &&
+              pathSegments[1] == 'join');
+
+      if (isTripJoin) {
+        // Cold-start trip join is handled by GoRouter deep-link routes.
+        if (fromInitialLink) return;
+        final joinCode = host == 'trip' ? pathSegments[1] : pathSegments[2];
+        _handleJoinTrip(joinCode.trim());
         return;
       }
 
       // nubbill://reset-password (handled by Supabase auth listener)
-      if (pathSegments.isNotEmpty && pathSegments[0] == 'reset-password') {
+      if ((host == 'reset-password') ||
+          (pathSegments.isNotEmpty && pathSegments[0] == 'reset-password')) {
         // Supabase handles the token extraction; auth listener navigates
         return;
       }
@@ -105,6 +135,28 @@ class DeepLinkService {
       await _ref.read(friendServiceProvider).sendRequestById(userId);
       _ref.invalidate(pendingRequestsProvider);
       _showMessage('ส่งคำขอเป็นเพื่อนแล้ว!');
+    } catch (e) {
+      _showMessage('$e');
+    }
+  }
+
+  Future<void> _handleJoinTrip(String joinCode) async {
+    if (_context == null) return;
+
+    if (joinCode.isEmpty) {
+      _showMessage('ลิงก์เชิญเข้ากลุ่มไม่ถูกต้อง');
+      return;
+    }
+
+    try {
+      final tripId = await _ref
+          .read(tripServiceProvider)
+          .joinTripByCode(joinCode);
+      _ref.invalidate(tripsProvider);
+      if (_context!.mounted) {
+        GoRouter.of(_context!).go('/groups/$tripId');
+      }
+      _showMessage('เข้าร่วมกลุ่มสำเร็จ');
     } catch (e) {
       _showMessage('$e');
     }

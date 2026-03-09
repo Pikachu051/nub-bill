@@ -14,7 +14,10 @@ import 'package:nubbill/screens/create_group_screen.dart';
 import 'package:nubbill/screens/bill_details_page.dart';
 import 'package:nubbill/screens/payment_screen.dart';
 import 'package:nubbill/screens/manage_balance_page.dart';
+import 'package:nubbill/screens/group_overview_page.dart';
 import 'package:nubbill/screens/group_detail_page.dart';
+import 'package:nubbill/screens/group_settings_screen.dart';
+import 'package:nubbill/screens/join_group_deeplink_page.dart';
 import 'package:nubbill/screens/friends_screen.dart';
 import 'package:nubbill/screens/profile_screen.dart';
 import 'package:nubbill/screens/payment_methods_screen.dart';
@@ -51,14 +54,37 @@ final routerProvider = Provider<GoRouter>((ref) {
         members = maybeMembers;
       } else if (maybeMembers is List) {
         members = maybeMembers
-            .map((e) => e is TripMember
-                ? e
-                : TripMember.fromJson(e as Map<String, dynamic>))
+            .map(
+              (e) => e is TripMember
+                  ? e
+                  : TripMember.fromJson(e as Map<String, dynamic>),
+            )
             .toList();
       }
     }
 
     return CreateGroupScreen(initialTrip: trip, initialMembers: members);
+  }
+
+  String extractJoinCode(GoRouterState state) {
+    final fromParam = (state.pathParameters['code'] ?? '').trim();
+    if (fromParam.isNotEmpty) return fromParam;
+
+    final uri = state.uri;
+    final segments = uri.pathSegments;
+
+    if (uri.scheme == 'nubbill') {
+      if (uri.host == 'trip' && segments.length >= 2 && segments[0] == 'join') {
+        return segments[1].trim();
+      }
+      if (segments.length >= 3 && segments[0] == 'trip' && segments[1] == 'join') {
+        return segments[2].trim();
+      }
+    }
+
+    final uriString = uri.toString();
+    final match = RegExp(r'join/([A-Za-z0-9]{4,20})').firstMatch(uriString);
+    return match?.group(1)?.trim() ?? '';
   }
 
   return GoRouter(
@@ -152,9 +178,11 @@ final routerProvider = Provider<GoRouter>((ref) {
             members = membersRaw;
           } else if (membersRaw is List) {
             members = membersRaw
-                .map((e) => e is TripMember
-                    ? e
-                    : TripMember.fromJson(e as Map<String, dynamic>))
+                .map(
+                  (e) => e is TripMember
+                      ? e
+                      : TripMember.fromJson(e as Map<String, dynamic>),
+                )
                 .toList();
           }
           return AddExpenseScreen(
@@ -184,7 +212,9 @@ final routerProvider = Provider<GoRouter>((ref) {
             if (counterSplitIdsRaw is List<String>) {
               counterSplitIds = counterSplitIdsRaw;
             } else if (counterSplitIdsRaw is List) {
-              counterSplitIds = counterSplitIdsRaw.map((item) => item.toString()).toList();
+              counterSplitIds = counterSplitIdsRaw
+                  .map((item) => item.toString())
+                  .toList();
             }
 
             return PaymentScreen(
@@ -211,6 +241,18 @@ final routerProvider = Provider<GoRouter>((ref) {
           }
 
           return ManageBalancePage(groupId: groupId);
+        },
+      ),
+      GoRoute(
+        path: '/group-overview',
+        builder: (context, state) {
+          final extra = state.extra;
+          String groupId = '';
+          if (extra is Map<String, dynamic>) {
+            groupId = extra['groupId'] as String? ?? '';
+          }
+
+          return GroupOverviewPage(groupId: groupId);
         },
       ),
       GoRoute(
@@ -305,6 +347,28 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) {
           final groupId = state.pathParameters['id'] ?? '';
           return GroupDetailPage(groupId: groupId);
+        },
+      ),
+      GoRoute(
+        path: '/groups/:id/settings',
+        builder: (context, state) {
+          final groupId = state.pathParameters['id'] ?? '';
+          return GroupSettingsScreen(groupId: groupId);
+        },
+      ),
+      // Deep-link join handlers for cold-start routing.
+      GoRoute(
+        path: '/join/:code',
+        builder: (context, state) {
+          final code = extractJoinCode(state);
+          return JoinGroupDeepLinkPage(joinCode: code);
+        },
+      ),
+      GoRoute(
+        path: '/trip/join/:code',
+        builder: (context, state) {
+          final code = extractJoinCode(state);
+          return JoinGroupDeepLinkPage(joinCode: code);
         },
       ),
       // Alias used by notification deep links

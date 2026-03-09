@@ -184,7 +184,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [const Text("หรือเข้าใช้งานด้วย")],
                 ),
-                // TODO: Add Social Login buttons
               ],
             ),
           ),

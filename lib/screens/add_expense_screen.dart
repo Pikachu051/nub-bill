@@ -1755,10 +1755,6 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── 3 category chips ─────────────────────────────────────────
-          _buildCategoryRow(),
-          const SizedBox(height: 28),
-
           // ── bill details section label ────────────────────────────────
           const Text(
             'รายละเอียดบิล',
@@ -1777,6 +1773,22 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
           // ── date  +  attach photo ─────────────────────────────────────
           _buildDatePhotoRow(),
+          const SizedBox(height: 18),
+
+          // ── category section label ───────────────────────────────────
+          const Text(
+            'หมวดหมู่',
+            style: TextStyle(
+              color: _kText70,
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              fontFamily: _kFont,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // ── category chips ───────────────────────────────────────────
+          _buildCategoryRow(),
           const SizedBox(height: 28),
 
           // ── mode-specific content ─────────────────────────────────────
@@ -1793,58 +1805,64 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
   Widget _buildCategoryRow() {
     final cats = ExpenseCategory.values;
-    return Row(
-      children: cats.asMap().entries.map((entry) {
-        final i = entry.key;
-        final cat = entry.value;
-        final selected = cat == _category;
-        return Expanded(
-          child: Padding(
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: cats.asMap().entries.map((entry) {
+          final i = entry.key;
+          final cat = entry.value;
+          final selected = cat == _category;
+          return Padding(
             padding: EdgeInsets.only(right: i < cats.length - 1 ? 10 : 0),
-            child: GestureDetector(
-              onTap: () => setState(() => _category = cat),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: selected
-                      ? cat.color.withValues(alpha: 0.18)
-                      : const Color(0xFFF7F8FA),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: selected ? cat.color : Colors.transparent,
-                    width: 2,
+            child: SizedBox(
+              width: 98,
+              child: GestureDetector(
+                onTap: () => setState(() => _category = cat),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 160),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? cat.color.withValues(alpha: 0.18)
+                        : const Color(0xFFF7F8FA),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: selected ? cat.color : Colors.transparent,
+                      width: 2,
+                    ),
                   ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: cat.color,
-                        borderRadius: BorderRadius.circular(12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: cat.color,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(cat.icon, size: 20, color: Colors.white),
                       ),
-                      child: Icon(cat.icon, size: 20, color: Colors.white),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      cat.label,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                        color: selected ? const Color(0xFF141416) : _kText40,
-                        fontFamily: _kFont,
+                      const SizedBox(height: 6),
+                      Text(
+                        cat.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: selected ? const Color(0xFF141416) : _kText40,
+                          fontFamily: _kFont,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-        );
-      }).toList(),
+          );
+        }).toList(),
+      ),
     );
   }
 

@@ -3,7 +3,9 @@ import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/services/friend_service.dart';
+import 'package:nubbill/services/trip_service.dart';
 import 'package:nubbill/widgets/add_friend_modal.dart';
+import 'package:nubbill/widgets/group_quick_actions_fab.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
 
 const String _kFont = 'LINESeedSansTH';
@@ -86,34 +88,11 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
           ),
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'friendsCreateGroupFab',
-        onPressed: () => context.push('/groups/create'),
-        backgroundColor: const Color(0xFF81CEF2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-        icon: const Icon(AppIcons.people, color: Colors.white),
-        label: const Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              'สร้างกลุ่มใหม่',
-              style: TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            SizedBox(width: 8),
-            Text(
-              '|',
-              style: TextStyle(
-                color: Colors.white70,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            SizedBox(width: 8),
-            Icon(AppIcons.chevronUp, color: Colors.white, size: 24),
-          ],
-        ),
+      floatingActionButton: GroupQuickActionsFab(
+        onCreateGroup: () => context.push('/groups/create'),
+        onJoinedGroup: () {
+          ref.invalidate(tripsProvider);
+        },
       ),
     );
   }
@@ -256,9 +235,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
           ),
         ),
         InkWell(
-          onTap: () {
-            // TODO: Show filter options
-          },
+          onTap: () {},
           borderRadius: BorderRadius.circular(12),
           child: const Padding(
             padding: EdgeInsets.all(2),
@@ -463,9 +440,7 @@ class _FriendCardState extends ConsumerState<_FriendCard> {
     }
 
     return InkWell(
-      onTap: () {
-        // TODO: Navigate to friend detail
-      },
+      onTap: () {},
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 2),
