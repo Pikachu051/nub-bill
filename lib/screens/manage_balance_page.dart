@@ -512,45 +512,71 @@ class _ManageBalancePageState extends ConsumerState<ManageBalancePage>
         if (split.amount <= 0) continue;
         if (_locallyVerifiedSplitIds.contains(split.id)) continue;
 
+        // Use expense_payers for multi-payer support.
+        // Fall back to the single payer_id when the list is absent/empty.
+        final effectivePayers = expense.payers.isNotEmpty
+            ? expense.payers
+            : [
+                ExpensePayerInfo(
+                  memberId: expense.payerId,
+                  amount: expense.amount,
+                ),
+              ];
+        final totalPaid =
+            effectivePayers.fold(0.0, (s, p) => s + p.amount);
+        if (totalPaid <= 0) continue;
+
         final visual = _buildBillVisual(expense);
-        final bill = FriendBillItem(
-          splitId: split.id,
-          expenseId: expense.id,
-          title: expense.description.isEmpty
-              ? 'ไม่ระบุรายการ'
-              : expense.description,
-          date: _parseDate(expense.expenseDate),
-          amount: split.amount,
-          icon: visual.icon,
-          iconBackground: visual.background,
-        );
 
-        if (split.memberId == myMemberId && expense.payerId != myMemberId) {
-          final friend = memberById[expense.payerId];
-          final accumulator = oweMap.putIfAbsent(
-            expense.payerId,
-            () => _FriendDebtAccumulator(
-              memberId: expense.payerId,
-              name: friend?.displayName ?? 'Unknown',
-              avatarUrl: friend?.avatarUrl,
-              userId: friend?.userId,
-            ),
-          );
-          accumulator.addBill(bill);
-        }
+        for (final payer in effectivePayers) {
+          // A payer does not owe themselves.
+          if (payer.memberId == split.memberId) continue;
 
-        if (expense.payerId == myMemberId && split.memberId != myMemberId) {
-          final friend = memberById[split.memberId];
-          final accumulator = collectMap.putIfAbsent(
-            split.memberId,
-            () => _FriendDebtAccumulator(
-              memberId: split.memberId,
-              name: friend?.displayName ?? 'Unknown',
-              avatarUrl: friend?.avatarUrl,
-              userId: friend?.userId,
-            ),
+          // Portion of this split that this specific payer covered.
+          final portionOwed = split.amount * payer.amount / totalPaid;
+          if (portionOwed < 0.005) continue;
+
+          final bill = FriendBillItem(
+            splitId: split.id,
+            expenseId: expense.id,
+            title: expense.description.isEmpty
+                ? 'ไม่ระบุรายการ'
+                : expense.description,
+            date: _parseDate(expense.expenseDate),
+            amount: portionOwed,
+            icon: visual.icon,
+            iconBackground: visual.background,
           );
-          accumulator.addBill(bill);
+
+          if (split.memberId == myMemberId) {
+            // I owe this payer.
+            final friend = memberById[payer.memberId];
+            oweMap
+                .putIfAbsent(
+                  payer.memberId,
+                  () => _FriendDebtAccumulator(
+                    memberId: payer.memberId,
+                    name: friend?.displayName ?? 'Unknown',
+                    avatarUrl: friend?.avatarUrl,
+                    userId: friend?.userId,
+                  ),
+                )
+                .addBill(bill);
+          } else if (payer.memberId == myMemberId) {
+            // This split member owes me.
+            final friend = memberById[split.memberId];
+            collectMap
+                .putIfAbsent(
+                  split.memberId,
+                  () => _FriendDebtAccumulator(
+                    memberId: split.memberId,
+                    name: friend?.displayName ?? 'Unknown',
+                    avatarUrl: friend?.avatarUrl,
+                    userId: friend?.userId,
+                  ),
+                )
+                .addBill(bill);
+          }
         }
       }
     }
