@@ -1,0 +1,13 @@
+Analyzing nub-bill...                                           
+
+   info - The 'child' argument should be last in widget constructor invocations - lib\screens\home_page.dart:51:23 - sort_child_properties_last
+   info - Statements in an if should be enclosed in a block - lib\services\expense_service.dart:66:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\expense_service.dart:68:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\expense_service.dart:105:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\trip_service.dart:95:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\trip_service.dart:97:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\trip_service.dart:99:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\trip_service.dart:145:7 - curly_braces_in_flow_control_structures
+   info - Statements in an if should be enclosed in a block - lib\services\trip_service.dart:147:7 - curly_braces_in_flow_control_structures
+
+9 issues found. (ran in 3.2s)
