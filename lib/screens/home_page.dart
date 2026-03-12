@@ -9,182 +9,25 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
 import 'package:nubbill/widgets/group_quick_actions_fab.dart';
+import 'package:nubbill/services/trip_service.dart';
 
-/// Provider for user's groups directly from Supabase
+/// Provider for user's groups — derived from wallet summary so balances
+/// are always consistent with the wallet card (single API call).
 final userTripsProvider = FutureProvider.autoDispose<List<Trip>>((ref) async {
-  final userId = ref.watch(authUserIdProvider);
-  if (userId == null) return [];
-
-  try {
-    // Get trips where user is a member
-    final response = await SupabaseConfig.client
-        .from('trip_members')
-        .select('id, trip_id, role, trip:trips(*)')
-        .eq('user_id', userId)
-        .timeout(const Duration(seconds: 15));
-
-    final trips = <Trip>[];
-    final memberIdToTripId = <String, String>{};
-    final tripBalances = <String, double>{};
-
-    for (final item in response as List) {
-      if (item['trip'] != null) {
-        final trip = Trip.fromJson(item['trip'] as Map<String, dynamic>);
-        trips.add(trip);
-
-        final memberId = item['id'] as String?;
-        if (memberId != null) {
-          memberIdToTripId[memberId] = trip.id;
-          tripBalances[trip.id] = 0;
-        }
-      }
-    }
-
-    final myMemberIds = memberIdToTripId.keys.toList();
-    if (myMemberIds.isEmpty) return trips;
-
-    // Sum what current user still owes per trip (status != paid)
-    try {
-      final owedSplits = await SupabaseConfig.client
-          .from('expense_splits')
-          .select('member_id, amount')
-          .inFilter('member_id', myMemberIds)
-          .neq('status', 'paid');
-
-      for (final split in owedSplits as List) {
-        final memberId = split['member_id'] as String?;
-        final amount = (split['amount'] as num?)?.toDouble() ?? 0;
-        final tripId = memberId == null ? null : memberIdToTripId[memberId];
-        if (tripId != null) {
-          tripBalances[tripId] = (tripBalances[tripId] ?? 0) - amount;
-        }
-      }
-    } catch (e) {
-      debugPrint('Trips - failed to load owed splits: $e');
-    }
-
-    // Sum what others still owe current user per trip (expenses where user is payer)
-    try {
-      final receivableExpenses = await SupabaseConfig.client
-          .from('expenses')
-          .select(
-            'trip_id, payer_id, expense_splits(member_id, amount, status)',
-          )
-          .inFilter('payer_id', myMemberIds);
-
-      for (final expense in receivableExpenses as List) {
-        final tripId = expense['trip_id'] as String?;
-        final payerId = expense['payer_id'] as String?;
-        if (tripId == null || payerId == null) continue;
-
-        final splits = expense['expense_splits'] as List? ?? [];
-        for (final split in splits) {
-          final status = split['status'] as String?;
-          final debtorMemberId = split['member_id'] as String?;
-          if (status == 'paid' ||
-              debtorMemberId == null ||
-              debtorMemberId == payerId) {
-            continue;
-          }
-
-          final amount = (split['amount'] as num?)?.toDouble() ?? 0;
-          tripBalances[tripId] = (tripBalances[tripId] ?? 0) + amount;
-        }
-      }
-    } catch (e) {
-      debugPrint('Trips - failed to load receivable splits: $e');
-    }
-
-    return trips
-        .map(
-          (trip) => Trip(
-            id: trip.id,
-            name: trip.name,
-            category: trip.category,
-            joinCode: trip.joinCode,
-            coverUrl: trip.coverUrl,
-            startDate: trip.startDate,
-            endDate: trip.endDate,
-            createdBy: trip.createdBy,
-            createdAt: trip.createdAt,
-            updatedAt: trip.updatedAt,
-            balance: tripBalances[trip.id] ?? 0,
-            memberCount: trip.memberCount,
-            myRole: trip.myRole,
-          ),
-        )
-        .toList();
-  } catch (e) {
-    debugPrint('Failed to load trips: $e');
-    rethrow; // Let AsyncValue.error handle it gracefully
-  }
+  final wallet = await ref.watch(walletSummaryProvider.future);
+  return wallet.trips;
 });
 
-/// Provider for wallet summary (total owed to user & user owes)
-final walletSummaryProvider = FutureProvider.autoDispose<Map<String, double>>((
-  ref,
-) async {
-  try {
-    final userId = ref.watch(authUserIdProvider);
-    if (userId == null) return {'toReceive': 0.0, 'toPay': 0.0};
+/// Provider for wallet summary using the backend's canonical balance logic.
+/// Replaces the old direct-Supabase queries that had self-split and
+/// multi-payer bugs.
+final walletSummaryProvider =
+    FutureProvider.autoDispose<WalletSummary>((ref) async {
+  final userId = ref.watch(authUserIdProvider);
+  if (userId == null) return const WalletSummary.empty();
 
-    // Get member IDs for this user
-    final memberResponse = await SupabaseConfig.client
-        .from('trip_members')
-        .select('id')
-        .eq('user_id', userId)
-        .timeout(const Duration(seconds: 15));
-
-    final memberIds = (memberResponse as List)
-        .map((m) => m['id'] as String)
-        .toList();
-
-    if (memberIds.isEmpty) return {'toReceive': 0.0, 'toPay': 0.0};
-
-    double toPay = 0.0;
-    double toReceive = 0.0;
-
-    // Get expense splits where user owes money (unpaid)
-    try {
-      final owesResponse = await SupabaseConfig.client
-          .from('expense_splits')
-          .select('amount')
-          .inFilter('member_id', memberIds)
-          .eq('status', 'unpaid');
-
-      for (final split in owesResponse as List) {
-        toPay += (split['amount'] as num).toDouble();
-      }
-    } catch (e) {
-      // Expense splits query failed, continue with 0
-      debugPrint('Wallet - expense_splits query failed: $e');
-    }
-
-    // Get expenses created by user's members where others owe money
-    try {
-      final toReceiveResponse = await SupabaseConfig.client
-          .from('expenses')
-          .select('expense_splits(amount, status)')
-          .inFilter('payer_id', memberIds);
-
-      for (final expense in toReceiveResponse as List) {
-        final splits = expense['expense_splits'] as List? ?? [];
-        for (final split in splits) {
-          if (split['status'] == 'unpaid') {
-            toReceive += (split['amount'] as num).toDouble();
-          }
-        }
-      }
-    } catch (e) {
-      // Expenses query failed, continue with 0
-      debugPrint('Wallet - expenses query failed: $e');
-    }
-
-    return {'toReceive': toReceive, 'toPay': toPay};
-  } catch (e) {
-    debugPrint('Wallet provider error: $e');
-    return {'toReceive': 0.0, 'toPay': 0.0};
-  }
+  final service = ref.read(tripServiceProvider);
+  return service.getWalletSummary();
 });
 
 class HomePage extends ConsumerStatefulWidget {
@@ -209,9 +52,15 @@ class _HomePageState extends ConsumerState<HomePage> {
     _homeRealtimeChannel = SupabaseConfig.client
         .channel('home-wallet-updates')
         .onPostgresChanges(
-          event: PostgresChangeEvent.update,
+          event: PostgresChangeEvent.all,
           schema: 'public',
           table: 'expense_splits',
+          callback: (_) => _refreshWallet(),
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.all,
+          schema: 'public',
+          table: 'expenses',
           callback: (_) => _refreshWallet(),
         )
         .onPostgresChanges(
@@ -399,7 +248,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 
   //Wallet widget
-  Widget _buildWalletCard(AsyncValue<Map<String, double>> walletAsync) {
+  Widget _buildWalletCard(AsyncValue<WalletSummary> walletAsync) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -422,9 +271,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         ),
         error: (error, stackTrace) => const Text('ไม่สามารถโหลดข้อมูลได้'),
         data: (wallet) {
-          final toReceive = wallet['toReceive'] ?? 0;
-          final toPay = wallet['toPay'] ?? 0;
-          final balance = toReceive - toPay;
+          final toReceive = wallet.toReceive;
+          final toPay = wallet.toPay;
+          final balance = wallet.balance;
 
           return Column(
             children: [

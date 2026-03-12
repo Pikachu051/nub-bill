@@ -301,4 +301,69 @@ class TripService {
 
     return response.data['cover_url'] as String;
   }
+
+  /// GET /api/wallet/summary - Get wallet summary with per-trip balances
+  Future<WalletSummary> getWalletSummary() async {
+    final response = await _client.get('/wallet/summary');
+
+    if (!response.isSuccess || response.data == null) {
+      throw Exception(response.error ?? 'Failed to load wallet summary');
+    }
+
+    return WalletSummary.fromJson(response.data as Map<String, dynamic>);
+  }
+}
+
+/// Wallet summary response from backend
+class WalletSummary {
+  final double toReceive;
+  final double toPay;
+  final List<Trip> trips;
+
+  const WalletSummary({
+    required this.toReceive,
+    required this.toPay,
+    required this.trips,
+  });
+
+  const WalletSummary.empty()
+      : toReceive = 0,
+        toPay = 0,
+        trips = const [];
+
+  double get balance => toReceive - toPay;
+
+  factory WalletSummary.fromJson(Map<String, dynamic> json) {
+    final tripsData = json['trips'] as List<dynamic>? ?? [];
+    return WalletSummary(
+      toReceive: (json['to_receive'] as num?)?.toDouble() ?? 0,
+      toPay: (json['to_pay'] as num?)?.toDouble() ?? 0,
+      trips: tripsData.map((t) {
+        final tripJson = t as Map<String, dynamic>;
+        return Trip(
+          id: tripJson['trip_id'] as String,
+          name: tripJson['trip_name'] as String,
+          category: TripCategory.fromString(tripJson['category'] as String?),
+          joinCode: tripJson['join_code'] as String? ?? '', // not returned by wallet summary
+          coverUrl: tripJson['cover_url'] as String?,
+          startDate: tripJson['start_date'] != null
+              ? DateTime.tryParse(tripJson['start_date'] as String)
+              : null,
+          endDate: tripJson['end_date'] != null
+              ? DateTime.tryParse(tripJson['end_date'] as String)
+              : null,
+          createdBy: tripJson['created_by'] as String? ?? '',
+          createdAt: tripJson['created_at'] != null
+              ? DateTime.parse(tripJson['created_at'] as String)
+              : DateTime.now(),
+          updatedAt: tripJson['updated_at'] != null
+              ? DateTime.parse(tripJson['updated_at'] as String)
+              : DateTime.now(),
+          balance: (tripJson['balance'] as num?)?.toDouble() ?? 0,
+          memberCount: tripJson['member_count'] as int? ?? 0,
+          myRole: MemberRole.fromString(tripJson['my_role'] as String?),
+        );
+      }).toList(),
+    );
+  }
 }
