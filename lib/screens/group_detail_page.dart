@@ -18,6 +18,7 @@ import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/widgets/half_width_tab_indicator.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
 import 'package:nubbill/widgets/settlement_detail_modal.dart';
+import 'package:nubbill/shared/widgets/animated_item_wrapper.dart';
 
 const _walletLoadTimeout = Duration(seconds: 12);
 const String _kFont = 'LINESeedSansTH';
@@ -926,15 +927,21 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
           }
         }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (dateHeader != null) dateHeader,
-            if (entry.expense != null)
-              _buildExpenseCard(entry.expense!)
-            else if (entry.settlement != null)
-              _buildSettlementCard(entry.settlement!),
-          ],
+        final entryKey = entry.expense?.id ?? entry.settlement?.id ?? '$index';
+
+        return AnimatedItemWrapper(
+          key: ValueKey(entryKey),
+          index: index,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (dateHeader != null) dateHeader,
+              if (entry.expense != null)
+                _buildExpenseCard(entry.expense!)
+              else if (entry.settlement != null)
+                _buildSettlementCard(entry.settlement!),
+            ],
+          ),
         );
       },
     );
@@ -1104,7 +1111,11 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     // Find user's split in this expense
     final mySplits = expense.splits.where((s) => s.memberId == myId).toList();
     final mySplit = mySplits.isNotEmpty ? mySplits.first : null;
-    final isPayer = expense.payerId == myId;
+
+    // Check if user is a payer (either primary payer OR in multi-payer list)
+    final isPrimaryPayer = expense.payerId == myId;
+    final isMultiPayer = expense.payers.any((p) => p.memberId == myId);
+    final isPayer = isPrimaryPayer || isMultiPayer;
 
     if (isPayer) {
       // As payer, show "รอรับเงิน" while someone else is still unpaid.
@@ -1145,7 +1156,9 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
         .where((s) => s.memberId != myId)
         .toList();
     final unpaidOtherSplits = otherSplits.where((s) => s.status != 'paid');
-    final isPayer = expense.payerId == myId;
+    // Check both primary payer and multi-payer list
+    final isPayer = expense.payerId == myId ||
+        expense.payers.any((p) => p.memberId == myId);
 
     switch (status) {
       case _BillStatus.youOwe:
@@ -1168,7 +1181,9 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
     final myId = _myMemberId;
     if (myId == null) return 'คุณเคลียร์เรียบร้อยแล้ว';
 
-    final isPayer = expense.payerId == myId;
+    // Check both primary payer and multi-payer list
+    final isPayer = expense.payerId == myId ||
+        expense.payers.any((p) => p.memberId == myId);
     final otherSplits = expense.splits
         .where((s) => s.memberId != myId)
         .toList();
@@ -1603,13 +1618,21 @@ class _GroupDetailPageState extends ConsumerState<GroupDetailPage>
             if (myDebts.isNotEmpty) ...[
               _buildDebtSectionHeader('รายการของฉัน'),
               const SizedBox(height: 8),
-              ...myDebts.map((d) => _buildDebtCard(d, currentUserId)),
+              ...myDebts.asMap().entries.map((entry) => AnimatedItemWrapper(
+                key: ValueKey('my-debt-${entry.value.fromUserId}-${entry.value.toUserId}'),
+                index: entry.key,
+                child: _buildDebtCard(entry.value, currentUserId),
+              )),
               const SizedBox(height: 16),
             ],
             if (otherDebts.isNotEmpty) ...[
               _buildDebtSectionHeader('เพื่อนคนอื่น'),
               const SizedBox(height: 8),
-              ...otherDebts.map((d) => _buildDebtCard(d, currentUserId)),
+              ...otherDebts.asMap().entries.map((entry) => AnimatedItemWrapper(
+                key: ValueKey('other-debt-${entry.value.fromUserId}-${entry.value.toUserId}'),
+                index: entry.key,
+                child: _buildDebtCard(entry.value, currentUserId),
+              )),
             ],
           ],
         );

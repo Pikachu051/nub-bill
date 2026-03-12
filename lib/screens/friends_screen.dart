@@ -7,6 +7,9 @@ import 'package:nubbill/services/trip_service.dart';
 import 'package:nubbill/widgets/add_friend_modal.dart';
 import 'package:nubbill/widgets/group_quick_actions_fab.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
+import 'package:nubbill/shared/widgets/realtime_animated_list.dart';
+import 'package:nubbill/shared/widgets/list_animations.dart';
+import 'package:nubbill/shared/widgets/animated_item_wrapper.dart';
 
 const String _kFont = 'LINESeedSansTH';
 
@@ -209,8 +212,12 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
             ),
             const SizedBox(height: 12),
             if (_requestsExpanded)
-              ...requests.incoming.map(
-                (req) => _IncomingRequestCard(request: req),
+              ...requests.incoming.asMap().entries.map(
+                (entry) => AnimatedItemWrapper(
+                  key: ValueKey(entry.value.id),
+                  index: entry.key,
+                  child: _IncomingRequestCard(request: entry.value),
+                ),
               ),
             const SizedBox(height: 24),
           ],
@@ -322,14 +329,19 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
           );
         }
 
-        return ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: filtered.length,
-          separatorBuilder: (_, _) => const SizedBox(height: 8),
-          itemBuilder: (context, index) {
-            return _FriendCard(friend: filtered[index]);
-          },
+        return RealtimeAnimatedColumn<Friend>(
+          items: filtered,
+          keyExtractor: (f) => f.id,
+          itemBuilder: (ctx, friend, animation) =>
+              slideInBuilder(ctx, Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _FriendCard(friend: friend),
+              ), animation),
+          removedItemBuilder: (ctx, friend, animation) =>
+              slideOutBuilder(ctx, Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _FriendCard(friend: friend),
+              ), animation),
         );
       },
     );

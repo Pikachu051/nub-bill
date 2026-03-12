@@ -3,8 +3,11 @@ import 'package:nubbill/shared/app_icons.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:nubbill/providers/groups_provider.dart';
+import 'package:nubbill/models/trip_model.dart';
 import 'package:nubbill/widgets/group_card.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
+import 'package:nubbill/shared/widgets/realtime_animated_list.dart';
+import 'package:nubbill/shared/widgets/list_animations.dart';
 
 class GroupsScreen extends ConsumerWidget {
   const GroupsScreen({super.key});
@@ -54,13 +57,14 @@ class GroupsScreen extends ConsumerWidget {
               ),
             );
           }
-          return ListView.builder(
+          return RealtimeAnimatedList<Trip>(
+            items: groups,
+            keyExtractor: (g) => g.id,
             padding: const EdgeInsets.all(16),
-            itemCount: groups.length,
-            itemBuilder: (context, index) {
-              final group = groups[index];
-              return GroupCard(group: group);
-            },
+            itemBuilder: (ctx, group, animation) =>
+                scaleInBuilder(ctx, GroupCard(group: group), animation),
+            removedItemBuilder: (ctx, group, animation) =>
+                scaleOutBuilder(ctx, GroupCard(group: group), animation),
           );
         },
         error: (err, stack) => RetryErrorState(

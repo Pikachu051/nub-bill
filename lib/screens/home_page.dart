@@ -5,11 +5,12 @@ import 'package:go_router/go_router.dart';
 import 'package:nubbill/services/auth_repository.dart';
 import 'package:nubbill/services/profile_service.dart';
 import 'package:nubbill/models/trip_model.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:nubbill/config/supabase_config.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
 import 'package:nubbill/widgets/group_quick_actions_fab.dart';
 import 'package:nubbill/services/trip_service.dart';
+import 'package:nubbill/shared/providers/realtime_invalidator.dart';
+import 'package:nubbill/shared/widgets/realtime_animated_list.dart';
+import 'package:nubbill/shared/widgets/list_animations.dart';
 
 /// Provider for user's groups — derived from wallet summary so balances
 /// are always consistent with the wallet card (single API call).
@@ -19,12 +20,14 @@ final userTripsProvider = FutureProvider.autoDispose<List<Trip>>((ref) async {
 });
 
 /// Provider for wallet summary using the backend's canonical balance logic.
-/// Replaces the old direct-Supabase queries that had self-split and
-/// multi-payer bugs.
+/// Auto-refreshes via walletRealtimeProvider when expenses/settlements/members change.
 final walletSummaryProvider =
     FutureProvider.autoDispose<WalletSummary>((ref) async {
   final userId = ref.watch(authUserIdProvider);
   if (userId == null) return const WalletSummary.empty();
+
+  // Watch realtime ticks to auto-refresh.
+  ref.watch(walletRealtimeProvider);
 
   final service = ref.read(tripServiceProvider);
   return service.getWalletSummary();
@@ -38,50 +41,10 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
-  RealtimeChannel? _homeRealtimeChannel;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _subscribeToWalletUpdates();
-    });
-  }
-
-  void _subscribeToWalletUpdates() {
-    _homeRealtimeChannel = SupabaseConfig.client
-        .channel('home-wallet-updates')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'expense_splits',
-          callback: (_) => _refreshWallet(),
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: 'expenses',
-          callback: (_) => _refreshWallet(),
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.update,
-          schema: 'public',
-          table: 'settlements',
-          callback: (_) => _refreshWallet(),
-        )
-        .subscribe();
-  }
-
   void _refreshWallet() {
     if (!mounted) return;
     ref.invalidate(userTripsProvider);
     ref.invalidate(walletSummaryProvider);
-  }
-
-  @override
-  void dispose() {
-    _homeRealtimeChannel?.unsubscribe();
-    super.dispose();
   }
 
   @override
@@ -434,10 +397,13 @@ class _HomePageState extends ConsumerState<HomePage> {
           );
         }
 
-        return Column(
-          children: trips
-              .map((trip) => _buildGroupCard(context, trip))
-              .toList(),
+        return RealtimeAnimatedColumn<Trip>(
+          items: trips,
+          keyExtractor: (t) => t.id,
+          itemBuilder: (ctx, trip, animation) =>
+              slideInBuilder(ctx, _buildGroupCard(ctx, trip), animation),
+          removedItemBuilder: (ctx, trip, animation) =>
+              slideOutBuilder(ctx, _buildGroupCard(ctx, trip), animation),
         );
       },
     );

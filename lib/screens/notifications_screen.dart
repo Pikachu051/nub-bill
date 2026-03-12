@@ -6,6 +6,7 @@ import 'package:nubbill/models/notification_model.dart';
 import 'package:nubbill/providers/notification_provider.dart';
 import 'package:nubbill/shared/app_icons.dart';
 import 'package:nubbill/widgets/notification_tile.dart';
+import 'package:nubbill/shared/widgets/animated_item_wrapper.dart';
 
 /// Full notifications feed with pagination, pull-to-refresh and mark-all-read.
 class NotificationsScreen extends ConsumerStatefulWidget {
@@ -178,22 +179,26 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             ),
           ),
           for (var index = 0; index < dateGroup.notifications.length; index++) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: NotificationTile(
-                notification: dateGroup.notifications[index],
-                onTap: () {
-                  final selectedNotification = dateGroup.notifications[index];
-                  if (!selectedNotification.isRead) {
-                    notificationNotifier.markRead(selectedNotification.id);
-                  }
-                  context.go(_routeForNotification(selectedNotification));
-                },
-                onDismiss: () {
-                  notificationNotifier.deleteNotification(
-                    dateGroup.notifications[index].id,
-                  );
-                },
+            AnimatedItemWrapper(
+              key: ValueKey(dateGroup.notifications[index].id),
+              index: index,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: NotificationTile(
+                  notification: dateGroup.notifications[index],
+                  onTap: () {
+                    final selectedNotification = dateGroup.notifications[index];
+                    if (!selectedNotification.isRead) {
+                      notificationNotifier.markRead(selectedNotification.id);
+                    }
+                    context.go(_routeForNotification(selectedNotification));
+                  },
+                  onDismiss: () {
+                    notificationNotifier.deleteNotification(
+                      dateGroup.notifications[index].id,
+                    );
+                  },
+                ),
               ),
             ),
           ],

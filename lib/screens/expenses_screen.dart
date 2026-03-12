@@ -6,12 +6,18 @@ import 'package:nubbill/services/auth_repository.dart';
 import 'package:nubbill/services/trip_service.dart';
 import 'package:nubbill/services/expense_service.dart';
 import 'package:nubbill/widgets/retry_error_state.dart';
+import 'package:nubbill/shared/providers/realtime_invalidator.dart';
+import 'package:nubbill/shared/widgets/realtime_animated_list.dart';
+import 'package:nubbill/shared/widgets/list_animations.dart';
 
 /// Provider for all user expenses across all trips
 final allExpensesProvider =
     FutureProvider.autoDispose<List<Map<String, dynamic>>>((ref) async {
       final userId = ref.watch(authUserIdProvider);
       if (userId == null) return [];
+
+      // Watch wallet realtime to auto-refresh when expenses change anywhere.
+      ref.watch(walletRealtimeProvider);
 
       final tripService = ref.read(tripServiceProvider);
       final expenseService = ref.read(expenseServiceProvider);
@@ -93,13 +99,14 @@ class ExpensesScreen extends ConsumerWidget {
             onRefresh: () async {
               ref.invalidate(allExpensesProvider);
             },
-            child: ListView.builder(
+            child: RealtimeAnimatedList<Map<String, dynamic>>(
+              items: expenses,
+              keyExtractor: (e) => e['id']?.toString() ?? '',
               padding: const EdgeInsets.all(16),
-              itemCount: expenses.length,
-              itemBuilder: (context, index) {
-                final expense = expenses[index];
-                return _ExpenseCard(expense: expense);
-              },
+              itemBuilder: (ctx, expense, animation) =>
+                  slideInBuilder(ctx, _ExpenseCard(expense: expense), animation),
+              removedItemBuilder: (ctx, expense, animation) =>
+                  slideOutBuilder(ctx, _ExpenseCard(expense: expense), animation),
             ),
           );
         },
